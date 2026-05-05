@@ -90,6 +90,7 @@ IMU Lab is a browser-based tool designed for exploring, visualizing, and annotat
 ## 📁 Data Format
 
 ### Expected File Structure
+```
 data/
 └── sessions/
 └── [session_id]/
@@ -101,6 +102,7 @@ data/
 ├── 000001.png
 ├── 000002.png
 └── ...
+```
 
 ### IMU CSV Format
 ```csv
