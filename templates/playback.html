@@ -1,0 +1,1540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IMU Playback + Labeler</title>
+<link href="https://fonts.googleapis.com/css2?family=Azeret+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #060810;
+  --s1:      #0b0f18;
+  --s2:      #101624;
+  --s3:      #17202f;
+  --border:  #1d2a3d;
+  --border2: #273550;
+  --text:    #bec8de;
+  --dim:     #56698a;
+  --muted:   #28364d;
+  --amber:   #f59e0b;
+  --cyan:    #38bdf8;
+  --emerald: #34d399;
+  --rose:    #f87171;
+  --yellow:  #fbbf24;
+  --violet:  #a78bfa;
+  --orange:  #fb923c;
+  --gps:     #4ade80;
+  --white:   #e8eef8;
+  --mono: 'Azeret Mono', monospace;
+  --cond: 'Barlow Condensed', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--mono); font-size: 12px; }
+
+/* ── Header ── */
+header {
+  height: 44px; background: var(--s1); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px; padding: 0 12px; flex-shrink: 0;
+}
+.logo { font-family: var(--cond); font-size: 15px; font-weight: 800; letter-spacing: 3px; color: var(--amber); text-transform: uppercase; white-space: nowrap; }
+.logo-dot { color: var(--dim); }
+.session-title { font-size: 10px; color: var(--dim); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; }
+.session-title .sid { color: var(--text); font-weight: 500; }
+.tbtn-group { display: flex; gap: 3px; }
+.tbtn {
+  width: 28px; height: 28px; background: var(--s3); border: 1px solid var(--border);
+  color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; transition: all .12s; flex-shrink: 0;
+}
+.tbtn:hover { background: var(--border2); border-color: var(--amber); color: var(--amber); }
+.tbtn.playing { background: var(--amber); border-color: var(--amber); color: #000; }
+.tbtn:disabled { opacity: .25; cursor: not-allowed; pointer-events: none; }
+.time-disp {
+  font-family: var(--cond); font-size: 19px; font-weight: 700; color: var(--amber);
+  letter-spacing: .5px; white-space: nowrap; min-width: 148px; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.speed-sel, .zoom-sel {
+  background: var(--s3); border: 1px solid var(--border); color: var(--text);
+  font-family: var(--mono); font-size: 10px; padding: 3px 5px; cursor: pointer;
+  transition: border-color .12s;
+}
+.speed-sel:focus, .zoom-sel:focus { outline: none; border-color: var(--amber); }
+.zoom-label { font-size: 8px; color: var(--dim); white-space: nowrap; }
+
+/* ── IMU source toggle ── */
+.src-group { display: flex; gap: 0; flex-shrink: 0; }
+.src-btn {
+  padding: 4px 9px; background: var(--s3); border: 1px solid var(--border);
+  color: var(--dim); font-family: var(--mono); font-size: 8px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: all .12s;
+  margin-left: -1px; position: relative;
+}
+.src-btn:first-child { margin-left: 0; }
+.src-btn:hover { border-color: var(--border2); color: var(--text); z-index: 1; }
+.src-btn.active { background: #f59e0b18; border-color: var(--amber); color: var(--amber); z-index: 2; }
+.src-btn:disabled { opacity: .25; cursor: not-allowed; }
+.save-btn {
+  padding: 5px 12px; background: transparent; border: 1px solid var(--dim);
+  color: var(--dim); font-family: var(--mono); font-size: 9px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 1.5px; cursor: pointer; transition: all .15s;
+  white-space: nowrap; flex-shrink: 0;
+}
+.save-btn:hover:not(:disabled) { border-color: var(--amber); color: var(--amber); }
+.save-btn.dirty { border-color: var(--amber); color: var(--amber); animation: pulse-btn 1.4s ease-in-out infinite; }
+.save-btn.saved { border-color: var(--gps); color: var(--gps); animation: none; }
+.save-btn:disabled { opacity: .3; cursor: not-allowed; }
+@keyframes pulse-btn {
+  0%,100% { box-shadow: 0 0 0 0 transparent; }
+  50%      { box-shadow: 0 0 10px 2px #f59e0b35; }
+}
+
+/* ── Main layout ── */
+.app-body { display: flex; height: calc(100vh - 44px - 76px); overflow: hidden; }
+
+/* ── Left sidebar ── */
+.sidebar {
+  width: 190px; flex-shrink: 0; border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden; background: var(--s1);
+}
+.ph {
+  padding: 6px 10px; font-size: 8px; text-transform: uppercase; letter-spacing: 2.5px;
+  color: var(--dim); border-bottom: 1px solid var(--border); background: var(--s1);
+  flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 6px;
+}
+.ph .ph-count { color: var(--text); font-size: 9px; }
+.session-list { overflow-y: auto; flex: 1; padding: 5px; display: flex; flex-direction: column; gap: 2px; min-height: 80px; }
+.session-list::-webkit-scrollbar { width: 3px; }
+.session-list::-webkit-scrollbar-thumb { background: var(--border2); }
+.s-item {
+  padding: 6px 8px; background: var(--s2); border: 1px solid var(--border);
+  cursor: pointer; transition: all .12s;
+}
+.s-item:hover { border-color: var(--border2); background: var(--s3); }
+.s-item.active { border-color: var(--amber); background: #f59e0b0d; }
+.s-name { font-size: 9px; color: var(--text); font-weight: 500; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.s-badges { display: flex; gap: 3px; flex-wrap: wrap; }
+.badge { font-size: 7px; padding: 1px 4px; border: 1px solid var(--border); color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+.badge.ok { border-color: #34d39966; color: var(--emerald); }
+.sidebar-sep { height: 1px; background: var(--border); flex-shrink: 0; }
+.draw-pill {
+  padding: 2px 7px; background: var(--s3); border: 1px solid var(--border);
+  color: var(--dim); cursor: pointer; font-family: var(--mono); font-size: 8px;
+  text-transform: uppercase; letter-spacing: 1px; transition: all .12s; white-space: nowrap;
+}
+.draw-pill:hover { border-color: var(--border2); color: var(--text); }
+.draw-pill.on { background: #f59e0b14; border-color: var(--amber); color: var(--amber); }
+.label-list {
+  overflow-y: auto; flex: 1; padding: 5px; display: flex; flex-direction: column;
+  gap: 2px; min-height: 60px;
+}
+.label-list::-webkit-scrollbar { width: 3px; }
+.label-list::-webkit-scrollbar-thumb { background: var(--border2); }
+.l-item {
+  padding: 5px 8px; background: var(--s2); border: 1px solid var(--border);
+  border-left: 3px solid var(--amber); cursor: pointer; transition: background .12s; position: relative;
+}
+.l-item:hover { background: var(--s3); }
+.l-row { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-bottom: 1px; }
+.l-name { font-size: 10px; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.l-dur { font-family: var(--cond); font-size: 13px; font-weight: 700; }
+.l-range { font-size: 8px; color: var(--dim); margin-top: 1px; }
+.l-del {
+  font-size: 10px; color: var(--rose); background: none; border: none; cursor: pointer;
+  padding: 0 2px; opacity: 0; transition: opacity .15s; flex-shrink: 0; line-height: 1;
+}
+.l-item:hover .l-del { opacity: 1; }
+.empty-hint { text-align: center; color: var(--muted); font-size: 8px; text-transform: uppercase; letter-spacing: 2px; padding: 14px 8px; line-height: 2.4; }
+
+/* ── Center charts ── */
+.center {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden;
+  border-right: 1px solid var(--border);
+}
+.charts-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+.chart-row { flex: 1; position: relative; border-bottom: 1px solid var(--border); min-height: 0; overflow: hidden; }
+.chart-label { position: absolute; top: 6px; left: 10px; font-size: 8px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); pointer-events: none; z-index: 2; }
+.chart-legend { 
+  position: absolute; top: 4px; right: 8px; display: flex; gap: 4px; 
+  z-index: 3; align-items: center; flex-wrap: wrap; max-width: 60%;
+  justify-content: flex-end;
+}
+
+/* ── Channel toggle buttons ── */
+.channel-toggle {
+  pointer-events: all;
+  cursor: pointer;
+  padding: 2px 7px;
+  font-size: 7px;
+  font-weight: 700;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-family: var(--mono);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  transition: opacity 0.15s, background 0.15s, transform 0.1s;
+  opacity: 0.35;
+  line-height: 1.6;
+  user-select: none;
+}
+.channel-toggle.active {
+  opacity: 1;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+.channel-toggle:hover { opacity: 0.75; transform: scale(1.05); }
+.channel-toggle.active:hover { opacity: 0.85; }
+
+.window-info {
+  position: absolute; bottom: 22px; right: 8px; font-size: 8px; color: var(--dim);
+  pointer-events: none; z-index: 2; letter-spacing: .5px;
+  background: #060810bb; padding: 1px 5px;
+}
+canvas.cv { display: block; width: 100% !important; height: 100% !important; }
+.track-row { flex: 0 0 44px; border-top: 1px solid var(--border); position: relative; overflow: hidden; }
+
+/* ── Right sidebar ── */
+.right-sidebar {
+  width: 200px; flex-shrink: 0; display: flex; flex-direction: column;
+  overflow: hidden; background: var(--s1);
+}
+.video-wrap { flex: 0 0 150px; background: #000; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+video { width: 100%; height: 100%; object-fit: contain; }
+.no-signal { font-size: 8px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; }
+.gps-map { flex: 1; position: relative; overflow: hidden; min-height: 60px; }
+canvas#cv-gps { display: block; }
+.gps-no-fix { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 8px; text-transform: uppercase; letter-spacing: 2px; pointer-events: none; }
+.gps-vals { display: grid; grid-template-columns: 1fr 1fr; flex-shrink: 0; border-top: 1px solid var(--border); }
+.gv { padding: 4px 8px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.gv:nth-child(2n) { border-right: none; }
+.gv:nth-last-child(-n+2) { border-bottom: none; }
+.gv-name { font-size: 7px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--dim); margin-bottom: 1px; }
+.gv-val { font-size: 10px; font-weight: 500; color: var(--gps); }
+.gv-val.none { color: var(--muted); }
+
+/* ── Transport bar ── */
+.transport {
+  height: 76px; background: var(--s1); border-top: 1px solid var(--border);
+  padding: 6px 14px 6px; display: flex; flex-direction: column; gap: 3px; flex-shrink: 0;
+}
+.minimap-wrap {
+  position: relative; width: 100%; height: 28px; background: var(--s2);
+  border: 1px solid var(--border); cursor: pointer; flex-shrink: 0; overflow: hidden;
+}
+canvas#cv-minimap { display: block; position: absolute; inset: 0; width: 100%; height: 100%; }
+.minimap-window {
+  position: absolute; top: 0; height: 100%;
+  background: rgba(245,158,11,0.12);
+  border-left: 1px solid rgba(245,158,11,0.6);
+  border-right: 1px solid rgba(245,158,11,0.6);
+  pointer-events: none;
+}
+.minimap-cursor {
+  position: absolute; top: 0; width: 1.5px; height: 100%;
+  background: rgba(255,255,255,0.7); pointer-events: none;
+}
+input[type=range].scrubber {
+  -webkit-appearance: none; width: 100%; height: 3px; background: var(--border2);
+  border-radius: 0; outline: none; cursor: pointer; transition: background .15s;
+}
+input[type=range].scrubber::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--amber); cursor: pointer; transition: transform .1s;
+}
+input[type=range].scrubber::-webkit-slider-thumb:hover { transform: scale(1.25); }
+input[type=range].scrubber:disabled { opacity: .3; cursor: not-allowed; }
+.tick-row { display: flex; justify-content: space-between; font-size: 8px; color: var(--muted); pointer-events: none; }
+
+/* ── Label popup ── */
+.overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 100;
+  display: none; align-items: center; justify-content: center;
+}
+.overlay.show { display: flex; }
+.popup {
+  background: var(--s2); border: 1px solid var(--border2);
+  padding: 18px; min-width: 280px; max-width: 360px; width: 90%;
+  animation: pop-in .15s ease;
+}
+@keyframes pop-in { from { opacity: 0; transform: scale(.95); } to { opacity: 1; transform: scale(1); } }
+.popup-title { font-family: var(--cond); font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--amber); margin-bottom: 3px; }
+.popup-time { font-size: 9px; color: var(--dim); margin-bottom: 12px; font-style: italic; }
+.popup input {
+  width: 100%; padding: 8px 10px; background: var(--s3); border: 1px solid var(--border2);
+  color: var(--white); font-family: var(--mono); font-size: 12px; outline: none;
+  transition: border-color .15px; margin-bottom: 8px;
+}
+.popup input:focus { border-color: var(--amber); }
+.popup input::placeholder { color: var(--muted); }
+.quick-row { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
+.q-btn {
+  padding: 3px 8px; font-family: var(--mono); font-size: 8px; background: var(--s3);
+  border: 1px solid var(--border); color: var(--dim); cursor: pointer; text-transform: uppercase;
+  letter-spacing: .5px; transition: all .12s;
+}
+.q-btn:hover { border-color: var(--amber); color: var(--amber); }
+.popup-btns { display: flex; gap: 6px; }
+.btn-ok, .btn-cancel {
+  flex: 1; padding: 8px; font-family: var(--mono); font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: all .15s; border: 1px solid;
+}
+.btn-ok { background: var(--amber); border-color: var(--amber); color: #000; }
+.btn-ok:hover { background: #fbbf24; }
+.btn-cancel { background: transparent; border-color: var(--border2); color: var(--dim); }
+.btn-cancel:hover { border-color: var(--text); color: var(--text); }
+
+/* ── Loading ── */
+.loading { position: fixed; inset: 0; background: #060810cc; z-index: 200; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 10px; }
+.loading.show { display: flex; }
+.loading-text { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: var(--amber); }
+.spinner { width: 22px; height: 22px; border: 2px solid var(--border2); border-top-color: var(--amber); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Keyboard hint ── */
+.kbd-hint {
+  font-size: 8px; color: var(--muted); white-space: nowrap;
+  position: fixed; bottom: 82px; right: 12px; letter-spacing: .5px; pointer-events: none;
+}
+.k { display: inline-block; padding: 1px 4px; border: 1px solid var(--muted); border-radius: 2px; margin: 0 1px; }
+.pan-active { cursor: grabbing !important; }
+</style>
+</head>
+<body>
+
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text">Loading session…</div>
+</div>
+
+<div class="overlay" id="overlay" onclick="onOverlayClick(event)">
+  <div class="popup" onclick="event.stopPropagation()">
+    <div class="popup-title">New Label</div>
+    <div class="popup-time" id="popup-range">—</div>
+    <input type="text" id="popup-input" placeholder="e.g. harsh braking, sharp turn…"
+           autocomplete="off" onkeydown="popupKey(event)">
+    <div class="quick-row">
+      <button class="q-btn" onclick="setQ('sharp acc')">sharp acc</button>
+      <button class="q-btn" onclick="setQ('harsh braking')">harsh braking</button>
+      <button class="q-btn" onclick="setQ('sharp turn')">sharp turn</button>
+      <button class="q-btn" onclick="setQ('normal')">normal</button>
+      <button class="q-btn" onclick="setQ('pothole')">pothole</button>
+      <button class="q-btn" onclick="setQ('lane change')">lane change</button>
+    </div>
+    <div class="popup-btns">
+      <button class="btn-ok" onclick="confirmPopup()">Create</button>
+      <button class="btn-cancel" onclick="closePopup()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<header>
+  <div class="logo">⬡<span class="logo-dot">·</span>IMU Lab</div>
+  <div class="session-title" id="session-title">No session loaded</div>
+  <div class="tbtn-group">
+    <button class="tbtn" id="btn-prev"  onclick="seekPrev()"   disabled title="Prev label [,]">⏮</button>
+    <button class="tbtn" id="btn-play"  onclick="togglePlay()" disabled title="Play / Pause [Space]">▶</button>
+    <button class="tbtn" id="btn-next"  onclick="seekNext()"   disabled title="Next label [.]">⏭</button>
+  </div>
+  <div class="time-disp" id="time-disp">— / —</div>
+  <select class="speed-sel" id="speed-sel" onchange="setSpeed(this.value)">
+    <option value="0.25">0.25×</option>
+    <option value="0.5">0.5×</option>
+    <option value="1" selected>1×</option>
+    <option value="2">2×</option>
+    <option value="4">4×</option>
+  </select>
+  <span class="zoom-label">Window:</span>
+  <select class="zoom-sel" id="zoom-sel" onchange="setZoomFromSelect(this.value)">
+    <option value="3000">3 s</option>
+    <option value="5000">5 s</option>
+    <option value="10000" selected>10 s</option>
+    <option value="20000">20 s</option>
+    <option value="30000">30 s</option>
+    <option value="60000">60 s</option>
+    <option value="0">All</option>
+  </select>
+  <div class="src-group" id="src-group">
+    <button class="src-btn active" id="src-raw"      onclick="setImuSource('raw')"      title="Raw IMU">Raw</button>
+    <button class="src-btn"        id="src-filtered"  onclick="setImuSource('filtered')"  title="Filtered IMU" disabled>Filt</button>
+  </div>
+  <button class="save-btn" id="save-btn" onclick="saveLabels()" disabled>Save Labels</button>
+</header>
+
+<div class="app-body">
+  <div class="sidebar">
+    <div class="ph">Sessions <span class="ph-count" id="session-count"></span></div>
+    <div class="session-list" id="session-list"><div class="empty-hint">Connecting…</div></div>
+    <div class="sidebar-sep"></div>
+    <div class="ph">
+      Labels <span class="ph-count" id="label-count"></span>
+      <button class="draw-pill" id="draw-pill" onclick="toggleDraw()" title="Toggle draw mode [D]">Draw</button>
+    </div>
+    <div class="label-list" id="label-list">
+      <div class="empty-hint" id="label-empty">No labels yet<br>⬡</div>
+    </div>
+  </div>
+
+  <div class="center">
+    <div class="ph">
+      IMU Signal
+      <span style="font-size:8px;color:var(--dim);" id="chart-hint">scroll=zoom · drag=pan · [D] draw labels</span>
+    </div>
+    <div class="charts-area">
+
+      <!-- Row 1: Accelerometer -->
+      <div class="chart-row" id="row-accel">
+        <div class="chart-label" id="lbl-accel">Accelerometer · m/s²</div>
+        <div class="chart-legend" id="legend-accel">
+          <!-- Populated by JS -->
+        </div>
+        <div class="window-info" id="win-info-accel"></div>
+        <canvas class="cv" id="cv-accel"></canvas>
+      </div>
+
+      <!-- Row 2: Gyroscope -->
+      <div class="chart-row" id="row-gyro">
+        <div class="chart-label" id="lbl-gyro">Gyroscope · rad/s</div>
+        <div class="chart-legend" id="legend-gyro">
+          <!-- Populated by JS -->
+        </div>
+        <canvas class="cv" id="cv-gyro"></canvas>
+      </div>
+
+      <!-- Row 3: Linear Acceleration -->
+      <div class="chart-row" id="row-linacc" style="display:none;">
+        <div class="chart-label">Linear Accel · m/s²</div>
+        <div class="chart-legend" id="legend-linacc">
+          <!-- Populated by JS -->
+        </div>
+        <canvas class="cv" id="cv-linacc"></canvas>
+      </div>
+
+      <!-- Row 4: Orientation -->
+      <div class="chart-row" id="row-orient" style="display:none;">
+        <div class="chart-label">Orientation · rad</div>
+        <div class="chart-legend" id="legend-orient">
+          <!-- Populated by JS -->
+        </div>
+        <canvas class="cv" id="cv-orient"></canvas>
+      </div>
+
+      <!-- Label track -->
+      <div class="track-row">
+        <div class="chart-label" style="top:3px;">Label Track</div>
+        <canvas class="cv" id="cv-track" style="cursor:pointer;"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="right-sidebar">
+    <div class="ph">Video <span class="ph-count" id="frame-info"></span></div>
+    <div class="video-wrap">
+      <div class="no-signal" id="vid-nosig">No frames</div>
+      <img id="frame-img" style="display:none; width:100%; height:100%; object-fit:contain;" alt="">
+    </div>
+    <div class="ph">GPS Trail</div>
+    <div class="gps-map" id="gps-map">
+      <canvas id="cv-gps"></canvas>
+      <div class="gps-no-fix" id="gps-nofix">◎ No data</div>
+    </div>
+    <div class="gps-vals">
+      <div class="gv"><div class="gv-name">Lat</div><div class="gv-val none" id="gv-lat">—</div></div>
+      <div class="gv"><div class="gv-name">Lon</div><div class="gv-val none" id="gv-lon">—</div></div>
+      <div class="gv"><div class="gv-name">Spd m/s</div><div class="gv-val none" id="gv-spd">—</div></div>
+      <div class="gv"><div class="gv-name">Alt m</div><div class="gv-val none" id="gv-alt">—</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="transport">
+  <div class="minimap-wrap" id="minimap-wrap">
+    <canvas id="cv-minimap"></canvas>
+    <div class="minimap-window" id="minimap-window"></div>
+    <div class="minimap-cursor" id="minimap-cursor"></div>
+  </div>
+  <input type="range" class="scrubber" id="scrubber" min="0" max="10000" value="0"
+         disabled oninput="onScrub(+this.value)">
+  <div class="tick-row" id="tick-row"></div>
+</div>
+
+<div class="kbd-hint">
+  <span class="k">Space</span>play  <span class="k">D</span>draw  <span class="k">←→</span>seek
+  <span class="k">scroll</span>zoom  <span class="k">drag</span>pan  <span class="k">,.&nbsp;</span>labels  <span class="k">⌘S</span>save
+</div>
+
+<script>
+// ── Palette ────────────────────────────────────────────────────────────────
+const PALETTE       = ['#f59e0b','#38bdf8','#34d399','#a78bfa','#f87171','#fb923c','#fbbf24','#4ade80','#e879f9','#67e8f9','#f97316'];
+const ACCEL_COLORS  = ['#38bdf8','#34d399','#f87171'];
+const GYRO_COLORS   = ['#fbbf24','#a78bfa','#fb923c'];
+const LINACC_COLORS = ['#67e8f9','#4ade80','#e879f9'];
+const ORIENT_COLORS = ['#f59e0b','#38bdf8','#a78bfa'];
+
+// Channel label names per chart type
+const CHANNEL_NAMES = {
+  accel:  ['X', 'Y', 'Z'],
+  gyro:   ['X', 'Y', 'Z'],
+  linacc: ['X', 'Y', 'Z'],
+  orient: ['Roll', 'Pitch', 'Yaw'],
+};
+const CHANNEL_COLORS = {
+  accel:  ACCEL_COLORS,
+  gyro:   GYRO_COLORS,
+  linacc: LINACC_COLORS,
+  orient: ORIENT_COLORS,
+};
+
+// ── Channel visibility state ───────────────────────────────────────────────
+const channelVisible = {
+  accel:  [true, true, true],
+  gyro:   [true, true, true],
+  linacc: [true, true, true],
+  orient: [true, true, true],
+};
+
+// ── Toggle a single channel ────────────────────────────────────────────────
+function toggleChannel(chartName, idx) {
+  channelVisible[chartName][idx] = !channelVisible[chartName][idx];
+  const btn = document.getElementById(`ch-${chartName}-${idx}`);
+  if (btn) btn.classList.toggle('active', channelVisible[chartName][idx]);
+}
+
+// ── Build legend toggle buttons for a chart ────────────────────────────────
+function buildLegend(chartName) {
+  const legend = document.getElementById(`legend-${chartName}`);
+  if (!legend) return;
+  legend.innerHTML = '';
+  const names  = CHANNEL_NAMES[chartName];
+  const colors = CHANNEL_COLORS[chartName];
+  names.forEach((name, i) => {
+    const btn = document.createElement('button');
+    btn.id        = `ch-${chartName}-${i}`;
+    btn.className = 'channel-toggle active';
+    btn.style.color = colors[i];
+    btn.textContent = name;
+    btn.title = `Toggle ${name} channel`;
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      toggleChannel(chartName, i);
+    });
+    legend.appendChild(btn);
+  });
+
+  // Autoscale button
+  const aBtn = document.createElement('button');
+  aBtn.id        = `autoscale-${chartName}`;
+  aBtn.className = 'draw-pill';
+  aBtn.style.cssText = 'margin-left:4px; pointer-events:all;';
+  aBtn.textContent   = 'Auto';
+  aBtn.addEventListener('click', e => { e.stopPropagation(); toggleAutoScale(chartName); });
+  legend.appendChild(aBtn);
+}
+
+function buildAllLegends() {
+  buildLegend('accel');
+  buildLegend('gyro');
+  buildLegend('linacc');
+  buildLegend('orient');
+  updateAutoscaleButtons();
+}
+
+const colorMap = {};
+let colorIdx = 0;
+function labelColor(name) {
+  if (!colorMap[name]) colorMap[name] = PALETTE[colorIdx++ % PALETTE.length];
+  return colorMap[name];
+}
+
+// ── Data ───────────────────────────────────────────────────────────────────
+let imuData  = [], gpsData = [], labels = [];
+let session  = null, dirty = false, labelId = 0;
+
+// ── Frame player ───────────────────────────────────────────────────────────
+let frameTs = [], framesDir = null, lastShownFrame = -1;
+
+// Raw IMU
+let accelChans = [[],[],[]], gyroChans = [[],[],[]];
+let timestamps = [], accelScale = null, gyroScale = null;
+
+// Filtered IMU
+let filtAccelChans  = [[],[],[]], filtGyroChans   = [[],[],[]];
+let filtLinAccChans = [[],[],[]], filtOrientChans = [[],[],[]];
+let filtTimestamps  = [];
+let filtAccelScale  = null, filtGyroScale   = null;
+let filtLinAccScale = null, filtOrientScale = null;
+let hasFiltered = false;
+
+// ── Autoscaling ────────────────────────────────────────────────────────────
+let autoScaleChart = { accel: false, gyro: false, linacc: false, orient: false };
+let currentViewScale = { accel: null, gyro: null, linacc: null, orient: null };
+let visibleRange = { start: 0, end: 0 };
+
+let imuSource = 'raw';
+let minTs = 0, maxTs = 1;
+
+// ── Playback ───────────────────────────────────────────────────────────────
+let currentMs = 0, playing = false, speed = 1.0;
+
+// ── Viewport ───────────────────────────────────────────────────────────────
+let windowMs = 10000, viewOffsetMs = 0, autoFollow = true;
+const CURSOR_POS = 0.25;
+
+// ── Pan / Draw ─────────────────────────────────────────────────────────────
+let isPanning = false, panStartX = 0, panStartOff = 0;
+let drawMode = false, isDragging = false, dragStart = null, dragEnd = null, pendingSel = null;
+
+// ── Canvas refs ────────────────────────────────────────────────────────────
+const cvAccel   = document.getElementById('cv-accel');
+const cvGyro    = document.getElementById('cv-gyro');
+const cvLinAcc  = document.getElementById('cv-linacc');
+const cvOrient  = document.getElementById('cv-orient');
+const cvTrack   = document.getElementById('cv-track');
+const cvGps     = document.getElementById('cv-gps');
+const cvMinimap = document.getElementById('cv-minimap');
+const ctxA      = cvAccel.getContext('2d');
+const ctxG      = cvGyro.getContext('2d');
+const ctxL      = cvLinAcc.getContext('2d');
+const ctxO      = cvOrient.getContext('2d');
+const ctxT      = cvTrack.getContext('2d');
+const ctxGps    = cvGps.getContext('2d');
+const ctxMM     = cvMinimap.getContext('2d');
+
+// ── Resize ─────────────────────────────────────────────────────────────────
+function resizeCanvas(cv, rowId) {
+  const el = document.getElementById(rowId);
+  if (!el || el.style.display === 'none') return;
+  const w = el.offsetWidth  || el.parentElement?.clientWidth  || 0;
+  const h = el.offsetHeight || 120;
+  if (w > 0) cv.width  = w;
+  if (h > 0) cv.height = h;
+}
+
+function resize() {
+  resizeCanvas(cvAccel,  'row-accel');
+  resizeCanvas(cvGyro,   'row-gyro');
+  resizeCanvas(cvLinAcc, 'row-linacc');
+  resizeCanvas(cvOrient, 'row-orient');
+
+  const tr = cvTrack.parentElement;
+  cvTrack.width  = tr.clientWidth;
+  cvTrack.height = tr.clientHeight;
+
+  const gm = document.getElementById('gps-map');
+  cvGps.width  = gm.clientWidth;
+  cvGps.height = gm.clientHeight;
+
+  const mm = document.getElementById('minimap-wrap');
+  cvMinimap.width  = mm.clientWidth;
+  cvMinimap.height = mm.clientHeight;
+}
+window.addEventListener('resize', resize);
+new ResizeObserver(resize).observe(document.querySelector('.app-body'));
+
+// ── Window helpers ─────────────────────────────────────────────────────────
+function effectiveWindow() { return windowMs > 0 ? windowMs : (maxTs - minTs) || 1; }
+function msToX(ms, W)      { return ((ms - viewOffsetMs) / effectiveWindow()) * W; }
+function xToMs(x, W)       { return viewOffsetMs + (x / W) * effectiveWindow(); }
+function msToXMM(ms, W)    { return ((ms - minTs) / Math.max(maxTs - minTs, 1)) * W; }
+function xToMsMM(x, W)     { return minTs + (x / W) * (maxTs - minTs); }
+function clamp(v, lo, hi)  { return Math.max(lo, Math.min(hi, v)); }
+
+// ── Compute scale from ALL data (respects visibility) ──────────────────────
+function computeScale(channels, visible) {
+  let mn = Infinity, mx = -Infinity;
+  channels.forEach((ch, ci) => {
+    if (visible && !visible[ci]) return;
+    ch.forEach(v => { if (v < mn) mn = v; if (v > mx) mx = v; });
+  });
+  if (!isFinite(mn)) return null;
+  const pad = (mx - mn) * 0.1 || 0.5;
+  return { mn: mn - pad, mx: mx + pad };
+}
+
+// ── Compute scale from VISIBLE window data ─────────────────────────────────
+function computeVisibleScale(channels, tsArr, viewStart, viewEnd, visible) {
+  if (!channels || !tsArr.length) return null;
+  let mn = Infinity, mx = -Infinity, hasData = false;
+
+  let lo = 0, hi = tsArr.length - 1;
+  while (lo < hi) { const m = (lo+hi)>>1; tsArr[m] < viewStart ? lo=m+1 : hi=m; }
+  const iStart = Math.max(0, lo-1);
+
+  for (let i = iStart; i < tsArr.length; i++) {
+    if (tsArr[i] > viewEnd) break;
+    hasData = true;
+    channels.forEach((ch, ci) => {
+      if (visible && !visible[ci]) return;
+      if (i < ch.length) {
+        const v = ch[i];
+        if (v < mn) mn = v;
+        if (v > mx) mx = v;
+      }
+    });
+  }
+  if (!hasData || !isFinite(mn)) return null;
+  const range = mx - mn || 1;
+  const pad   = range * 0.05;
+  return { mn: mn - pad, mx: mx + pad };
+}
+
+// ── Toggle autoscale ───────────────────────────────────────────────────────
+function toggleAutoScale(chartName) {
+  autoScaleChart[chartName] = !autoScaleChart[chartName];
+  updateAutoscaleButtons();
+  buildTicks();
+}
+
+function updateAutoscaleButtons() {
+  ['accel', 'gyro', 'linacc', 'orient'].forEach(name => {
+    const btn = document.getElementById(`autoscale-${name}`);
+    if (btn) {
+      btn.classList.toggle('on', autoScaleChart[name]);
+      btn.textContent = autoScaleChart[name] ? '⦿ Auto' : 'Auto';
+    }
+  });
+}
+
+// ── Auto-follow ────────────────────────────────────────────────────────────
+function updateAutoFollow() {
+  if (!autoFollow || minTs === maxTs) return;
+  const wMs = effectiveWindow();
+  viewOffsetMs = clamp(currentMs - wMs * CURSOR_POS, minTs, maxTs - wMs);
+}
+
+// ── Zoom ───────────────────────────────────────────────────────────────────
+function setZoomFromSelect(v) { setZoom(parseInt(v), null); }
+
+function setZoom(newWindowMs, focalMs) {
+  const wOld = effectiveWindow();
+  windowMs = newWindowMs;
+  const wNew = effectiveWindow();
+  const focal = focalMs !== null ? focalMs : currentMs;
+  const ratio = (focal - viewOffsetMs) / wOld;
+  viewOffsetMs = clamp(focal - ratio * wNew, minTs, Math.max(minTs, maxTs - wNew));
+
+  const sel = document.getElementById('zoom-sel');
+  const closest = [...sel.options].reduce((best, opt) => {
+    const ov = parseInt(opt.value);
+    if (ov === 0 && newWindowMs === 0) return opt;
+    if (newWindowMs === 0) return best;
+    return Math.abs(ov - newWindowMs) < Math.abs(parseInt(best.value) - newWindowMs) ? opt : best;
+  });
+  sel.value = closest.value;
+  updateWindowInfo();
+  updateMinimapOverlay();
+}
+
+function updateWindowInfo() {
+  document.getElementById('win-info-accel').textContent = `⟷ ${(effectiveWindow()/1000).toFixed(1)}s window`;
+}
+
+// ── Ticks ──────────────────────────────────────────────────────────────────
+function buildTicks() {
+  const row = document.getElementById('tick-row');
+  row.innerHTML = '';
+  if (maxTs <= minTs) return;
+  const wMs = effectiveWindow(), dur = wMs / 1000;
+  const n = Math.min(8, Math.max(2, Math.floor(dur / 2)));
+  for (let i = 0; i <= n; i++) {
+    const span = document.createElement('span');
+    span.textContent = ((viewOffsetMs + wMs * i / n) / 1000).toFixed(1) + 's';
+    row.appendChild(span);
+  }
+}
+
+// ── Main RAF loop ──────────────────────────────────────────────────────────
+let _raf = null, _lastFrameT = 0, _lastVideoSync = -999, _tickThrottle = 0;
+
+function mainLoop(t) {
+  if (playing && _lastFrameT > 0) {
+    const dt = (t - _lastFrameT) * speed;
+    currentMs += dt;
+    if (currentMs >= maxTs) {
+      currentMs = maxTs; playing = false;
+      document.getElementById('btn-play').classList.remove('playing');
+      document.getElementById('btn-play').textContent = '▶';
+    }
+    if (autoFollow) updateAutoFollow();
+
+    const frac = (currentMs - minTs) / (maxTs - minTs);
+    document.getElementById('scrubber').value = Math.round(frac * 10000);
+    updateTimeDisplay();
+
+    if (Math.abs(currentMs - _lastVideoSync) > 80) {
+      syncGPSDisplay(); syncFrame(); _lastVideoSync = currentMs;
+    }
+    _tickThrottle += dt;
+    if (_tickThrottle > 500) { buildTicks(); _tickThrottle = 0; }
+  }
+  _lastFrameT = t;
+
+  visibleRange.start = viewOffsetMs;
+  visibleRange.end   = viewOffsetMs + effectiveWindow();
+
+  const scales = getScales();
+
+  if (imuSource === 'raw') {
+    drawIMUChart(cvAccel, ctxA, accelChans, scales.accel, ACCEL_COLORS, timestamps, channelVisible.accel);
+    drawIMUChart(cvGyro,  ctxG, gyroChans,  scales.gyro,  GYRO_COLORS,  timestamps, channelVisible.gyro);
+  } else {
+    drawIMUChart(cvAccel,  ctxA, filtAccelChans,  scales.accel,  ACCEL_COLORS,   filtTimestamps, channelVisible.accel);
+    drawIMUChart(cvGyro,   ctxG, filtGyroChans,   scales.gyro,   GYRO_COLORS,    filtTimestamps, channelVisible.gyro);
+    drawIMUChart(cvLinAcc, ctxL, filtLinAccChans, scales.linacc, LINACC_COLORS,  filtTimestamps, channelVisible.linacc);
+    drawIMUChart(cvOrient, ctxO, filtOrientChans, scales.orient, ORIENT_COLORS,  filtTimestamps, channelVisible.orient);
+  }
+
+  drawTrack();
+  drawGPS();
+  updateMinimapOverlay();
+  _raf = requestAnimationFrame(mainLoop);
+}
+
+// ── Get scales (autoscale-aware, visibility-aware) ─────────────────────────
+function getScales() {
+  if (imuSource === 'raw') {
+    return {
+      accel: autoScaleChart.accel
+        ? computeVisibleScale(accelChans, timestamps, visibleRange.start, visibleRange.end, channelVisible.accel) || accelScale
+        : accelScale,
+      gyro: autoScaleChart.gyro
+        ? computeVisibleScale(gyroChans,  timestamps, visibleRange.start, visibleRange.end, channelVisible.gyro)  || gyroScale
+        : gyroScale,
+    };
+  } else {
+    return {
+      accel:  autoScaleChart.accel
+        ? computeVisibleScale(filtAccelChans,  filtTimestamps, visibleRange.start, visibleRange.end, channelVisible.accel)  || filtAccelScale
+        : filtAccelScale,
+      gyro:   autoScaleChart.gyro
+        ? computeVisibleScale(filtGyroChans,   filtTimestamps, visibleRange.start, visibleRange.end, channelVisible.gyro)   || filtGyroScale
+        : filtGyroScale,
+      linacc: autoScaleChart.linacc
+        ? computeVisibleScale(filtLinAccChans, filtTimestamps, visibleRange.start, visibleRange.end, channelVisible.linacc) || filtLinAccScale
+        : filtLinAccScale,
+      orient: autoScaleChart.orient
+        ? computeVisibleScale(filtOrientChans, filtTimestamps, visibleRange.start, visibleRange.end, channelVisible.orient) || filtOrientScale
+        : filtOrientScale,
+    };
+  }
+}
+
+// ── Draw IMU chart ─────────────────────────────────────────────────────────
+// `visible` is bool[3] — skip drawing a channel if its flag is false
+function drawIMUChart(cv, ctx, channels, scale, colors, tsArr, visible) {
+  const W = cv.width, H = cv.height;
+  if (!W || !H) return;
+  const PAD = 16, PH = H - PAD;
+
+  ctx.fillStyle = '#060810';
+  ctx.fillRect(0, 0, W, H);
+
+  if (!tsArr || !tsArr.length) return;
+
+  const wMs = effectiveWindow(), viewEnd = viewOffsetMs + wMs;
+
+  // Horizontal grid
+  ctx.strokeStyle = '#0d1420'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 1; i < 4; i++) { ctx.moveTo(0, PH*i/4); ctx.lineTo(W, PH*i/4); }
+  ctx.stroke();
+
+  // Vertical time grid
+  const gridIntervalMs = niceInterval(wMs, 6);
+  const gridStart = Math.ceil(viewOffsetMs / gridIntervalMs) * gridIntervalMs;
+  ctx.strokeStyle = '#111d2e'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let t = gridStart; t <= viewEnd; t += gridIntervalMs) {
+    const x = msToX(t, W); ctx.moveTo(x, 0); ctx.lineTo(x, PH);
+  }
+  ctx.stroke();
+
+  // Time axis
+  ctx.fillStyle = '#060810'; ctx.fillRect(0, PH, W, PAD);
+  ctx.strokeStyle = '#1d2a3d'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, PH); ctx.lineTo(W, PH); ctx.stroke();
+  ctx.fillStyle = '#3a4e6a'; ctx.font = "8px 'Azeret Mono'";
+  for (let t = gridStart; t <= viewEnd; t += gridIntervalMs) {
+    ctx.fillText((t/1000).toFixed(gridIntervalMs < 1000 ? 2 : 1)+'s', msToX(t,W)+2, H-3);
+  }
+
+  // Label bands
+  labels.forEach(lbl => {
+    const x1 = msToX(lbl.start_ms, W), x2 = msToX(lbl.end_ms, W);
+    if (x2 < 0 || x1 > W) return;
+    const col = labelColor(lbl.label);
+    const cx1 = Math.max(0,x1), cx2 = Math.min(W,x2);
+    ctx.fillStyle = col+'22'; ctx.fillRect(cx1, 0, cx2-cx1, PH);
+    ctx.strokeStyle = col+'88'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (x1 >= 0) { ctx.moveTo(x1,0); ctx.lineTo(x1,PH); }
+    if (x2 <= W) { ctx.moveTo(x2,0); ctx.lineTo(x2,PH); }
+    ctx.stroke();
+    if (cx2-cx1 > 16) {
+      ctx.font = "bold 8px 'Azeret Mono'"; ctx.fillStyle = col+'cc';
+      ctx.fillText(lbl.label, cx1+3, 18);
+    }
+  });
+
+  // Drag selection
+  if (isDragging && dragStart !== null && dragEnd !== null) {
+    const lo = Math.min(dragStart,dragEnd), hi = Math.max(dragStart,dragEnd);
+    const sx1 = msToX(lo,W), sx2 = msToX(hi,W);
+    ctx.fillStyle = '#f59e0b18'; ctx.fillRect(sx1, 0, sx2-sx1, PH);
+    ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 1.5; ctx.setLineDash([5,4]);
+    ctx.beginPath(); ctx.moveTo(sx1,0); ctx.lineTo(sx1,PH); ctx.moveTo(sx2,0); ctx.lineTo(sx2,PH);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // Signal lines — skip hidden channels
+  if (scale && tsArr.length >= 2) {
+    const { mn, mx } = scale;
+    const rng = mx - mn || 1, sY = PH / rng;
+    const marginMs = wMs * 0.05;
+    const vStart = viewOffsetMs - marginMs, vEnd_m = viewEnd + marginMs;
+
+    let lo = 0, hi = tsArr.length - 1;
+    while (lo < hi) { const m = (lo+hi)>>1; tsArr[m] < vStart ? lo=m+1 : hi=m; }
+    const iStart = Math.max(0, lo-1);
+
+    channels.forEach((data, ci) => {
+      // ─── VISIBILITY CHECK ───
+      if (visible && !visible[ci]) return;
+      if (!data.length) return;
+
+      ctx.strokeStyle = colors[ci]; ctx.lineWidth = 1.4; ctx.setLineDash([]);
+      ctx.beginPath();
+      let moved = false;
+      for (let i = iStart; i < data.length; i++) {
+        if (tsArr[i] > vEnd_m) break;
+        const x = msToX(tsArr[i], W);
+        const y = PH - (data[i] - mn) * sY;
+        if (!moved) { ctx.moveTo(x,y); moved=true; } else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    });
+  }
+
+  // Zero line
+  if (scale) {
+    const { mn, mx } = scale;
+    const rng = mx - mn || 1, sY = PH / rng;
+    const zy = PH - (0 - mn) * sY;
+    if (zy > 0 && zy < PH) {
+      ctx.strokeStyle = '#ffffff18'; ctx.lineWidth = 1; ctx.setLineDash([4,6]);
+      ctx.beginPath(); ctx.moveTo(0, zy); ctx.lineTo(W, zy); ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+
+  // Cursor
+  const cx = msToX(currentMs, W);
+  if (cx >= 0 && cx <= W) {
+    const grad = ctx.createLinearGradient(cx-8,0,cx+8,0);
+    grad.addColorStop(0,'transparent');
+    grad.addColorStop(0.5,'rgba(255,255,255,0.07)');
+    grad.addColorStop(1,'transparent');
+    ctx.fillStyle = grad; ctx.fillRect(cx-8,0,16,PH);
+    ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1.5; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,PH); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    ctx.beginPath(); ctx.moveTo(cx-5,0); ctx.lineTo(cx+5,0); ctx.lineTo(cx,7); ctx.fill();
+  }
+}
+
+// ── IMU source switching ───────────────────────────────────────────────────
+function setImuSource(src) {
+  imuSource = src;
+  ['raw','filtered'].forEach(s =>
+    document.getElementById(`src-${s}`).classList.toggle('active', s === src));
+
+  const isFilt = src === 'filtered';
+  document.getElementById('row-linacc').style.display = isFilt ? '' : 'none';
+  document.getElementById('row-orient').style.display = isFilt ? '' : 'none';
+
+  document.getElementById('lbl-accel').textContent = isFilt ? 'Accel (filtered) · m/s²' : 'Accelerometer · m/s²';
+  document.getElementById('lbl-gyro').textContent  = isFilt ? 'Angular Velocity · rad/s' : 'Gyroscope · rad/s';
+
+  requestAnimationFrame(() => resize());
+}
+
+// ── Nice interval ──────────────────────────────────────────────────────────
+function niceInterval(rangeMs, targetCount) {
+  const raw = rangeMs / targetCount;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
+  const normalized = raw / magnitude;
+  let nice = normalized < 1.5 ? 1 : normalized < 3.5 ? 2 : normalized < 7.5 ? 5 : 10;
+  return nice * magnitude;
+}
+
+// ── Draw label track ───────────────────────────────────────────────────────
+function drawTrack() {
+  const W = cvTrack.width, H = cvTrack.height;
+  if (!W || !H) return;
+  ctxT.fillStyle = '#0b0f18'; ctxT.fillRect(0,0,W,H);
+  ctxT.strokeStyle = '#1d2a3d'; ctxT.lineWidth = 1;
+  ctxT.beginPath(); ctxT.moveTo(0,H/2); ctxT.lineTo(W,H/2); ctxT.stroke();
+
+  labels.forEach(lbl => {
+    const x1 = Math.max(0,msToX(lbl.start_ms,W)), x2 = Math.min(W,msToX(lbl.end_ms,W));
+    if (x2 <= x1) return;
+    const col = labelColor(lbl.label);
+    ctxT.fillStyle = col+'cc'; ctxT.fillRect(x1,2,x2-x1,H-4);
+    if (x2-x1 > 18) {
+      ctxT.font = "bold 8px 'Azeret Mono'"; ctxT.fillStyle = 'rgba(0,0,0,.8)';
+      ctxT.fillText(lbl.label, x1+3, H/2+3);
+    }
+  });
+
+  if (isDragging && dragStart !== null && dragEnd !== null) {
+    const lo = Math.min(dragStart,dragEnd), hi = Math.max(dragStart,dragEnd);
+    ctxT.fillStyle = '#f59e0b44';
+    ctxT.fillRect(msToX(lo,W), 1, msToX(hi,W)-msToX(lo,W), H-2);
+  }
+
+  const cx = msToX(currentMs, W);
+  if (cx >= 0 && cx <= W) {
+    ctxT.strokeStyle = 'rgba(255,255,255,.8)'; ctxT.lineWidth = 1.5;
+    ctxT.beginPath(); ctxT.moveTo(cx,0); ctxT.lineTo(cx,H); ctxT.stroke();
+  }
+}
+
+// ── Draw minimap ───────────────────────────────────────────────────────────
+function drawMinimap() {
+  const W = cvMinimap.width, H = cvMinimap.height;
+  if (!W || !H) return;
+  ctxMM.fillStyle = '#0b0f18'; ctxMM.fillRect(0,0,W,H);
+
+  const ts   = imuSource === 'filtered' ? filtTimestamps  : timestamps;
+  const chs  = imuSource === 'filtered' ? filtAccelChans  : accelChans;
+  const scl  = imuSource === 'filtered' ? filtAccelScale  : accelScale;
+  const cols = ACCEL_COLORS;
+  const vis  = channelVisible.accel;
+
+  if (!ts.length) return;
+  if (scl && ts.length > 1) {
+    const { mn, mx } = scl, rng = mx - mn || 1;
+    const step = Math.max(1, Math.floor(ts.length / W));
+    chs.forEach((ch, ci) => {
+      if (!vis[ci]) return;
+      ctxMM.strokeStyle = cols[ci]+'55'; ctxMM.lineWidth = 0.8;
+      ctxMM.beginPath();
+      let moved = false;
+      for (let i = 0; i < ch.length; i += step) {
+        const x = msToXMM(ts[i], W);
+        const y = H - 2 - ((ch[i]-mn)/rng)*(H-4);
+        if (!moved) { ctxMM.moveTo(x,y); moved=true; } else ctxMM.lineTo(x,y);
+      }
+      ctxMM.stroke();
+    });
+  }
+
+  labels.forEach(lbl => {
+    const x1 = msToXMM(lbl.start_ms,W), x2 = msToXMM(lbl.end_ms,W);
+    ctxMM.fillStyle = labelColor(lbl.label)+'44';
+    ctxMM.fillRect(x1, 0, Math.max(x2-x1,1), H);
+  });
+}
+
+function updateMinimapOverlay() {
+  if (minTs === maxTs) return;
+  const totalMs = maxTs - minTs;
+  const wMs = effectiveWindow();
+  const x1 = ((viewOffsetMs-minTs)/totalMs)*100;
+  const w  = (wMs/totalMs)*100;
+  const win = document.getElementById('minimap-window');
+  win.style.left  = clamp(x1,0,100)+'%';
+  win.style.width = clamp(w,0,100)+'%';
+  document.getElementById('minimap-cursor').style.left =
+    clamp(((currentMs-minTs)/totalMs)*100, 0, 100)+'%';
+}
+
+// ── Draw GPS ───────────────────────────────────────────────────────────────
+function drawGPS() {
+  const W = cvGps.width, H = cvGps.height;
+  if (!W || !H) return;
+  ctxGps.fillStyle = '#060810'; ctxGps.fillRect(0,0,W,H);
+  if (gpsData.length < 2) return;
+
+  let mnLat=Infinity, mxLat=-Infinity, mnLon=Infinity, mxLon=-Infinity;
+  gpsData.forEach(p => {
+    if (p.latitude  < mnLat) mnLat = p.latitude;  if (p.latitude  > mxLat) mxLat = p.latitude;
+    if (p.longitude < mnLon) mnLon = p.longitude; if (p.longitude > mxLon) mxLon = p.longitude;
+  });
+
+  const P=0.12, latS=Math.max(mxLat-mnLat,1e-4), lonS=Math.max(mxLon-mnLon,1e-4);
+  const toX = lon => P*W+((lon-mnLon)/lonS)*(1-2*P)*W;
+  const toY = lat => H-(P*H+((lat-mnLat)/latS)*(1-2*P)*H);
+
+  ctxGps.strokeStyle='#0d1420'; ctxGps.lineWidth=1; ctxGps.beginPath();
+  for (let i=1;i<4;i++) { ctxGps.moveTo(W*i/4,0); ctxGps.lineTo(W*i/4,H); ctxGps.moveTo(0,H*i/4); ctxGps.lineTo(W,H*i/4); }
+  ctxGps.stroke();
+
+  let splitIdx = gpsData.findIndex(p => p.timestamp_ms > currentMs);
+  if (splitIdx < 0) splitIdx = gpsData.length;
+  const past = gpsData.slice(0,splitIdx), future = gpsData.slice(splitIdx);
+
+  const drawPath = (pts,col,lw) => {
+    if (pts.length < 2) return;
+    ctxGps.beginPath();
+    pts.forEach((p,i) => { const x=toX(p.longitude),y=toY(p.latitude); i===0?ctxGps.moveTo(x,y):ctxGps.lineTo(x,y); });
+    ctxGps.strokeStyle=col; ctxGps.lineWidth=lw; ctxGps.stroke();
+  };
+  drawPath(future,'#1d2a3d',1.5);
+  drawPath(past,  '#4ade80',1.5);
+
+  if (past.length > 0) {
+    const last=past[past.length-1], lx=toX(last.longitude), ly=toY(last.latitude);
+    ctxGps.beginPath(); ctxGps.arc(lx,ly,5,0,Math.PI*2); ctxGps.fillStyle='#4ade80'; ctxGps.fill();
+    ctxGps.beginPath(); ctxGps.arc(lx,ly,9,0,Math.PI*2); ctxGps.strokeStyle='#4ade8055'; ctxGps.lineWidth=2; ctxGps.stroke();
+  }
+}
+
+// ── GPS display ────────────────────────────────────────────────────────────
+function syncGPSDisplay() {
+  if (!gpsData.length) return;
+  let lo=0, hi=gpsData.length-1;
+  while (lo<hi) { const m=(lo+hi)>>1; gpsData[m].timestamp_ms<currentMs?lo=m+1:hi=m; }
+  const p=gpsData[lo];
+  setText('gv-lat', p.latitude.toFixed(6),  false);
+  setText('gv-lon', p.longitude.toFixed(6), false);
+  setText('gv-spd', p.speed_mps.toFixed(2), false);
+  setText('gv-alt', p.altitude_m.toFixed(1),false);
+}
+function setText(id, val, isNone) {
+  const el=document.getElementById(id); el.textContent=val; el.classList.toggle('none',isNone);
+}
+
+// ── Frame sync ─────────────────────────────────────────────────────────────
+function syncFrame() {
+  if (!frameTs.length || !framesDir) return;
+  let lo = 0, hi = frameTs.length - 1;
+  while (lo < hi) {
+    const m = (lo + hi + 1) >> 1;
+    frameTs[m].timestamp_ms <= currentMs ? lo = m : hi = m - 1;
+  }
+
+  const idx = frameTs[lo].frame_idx;
+  if (idx === lastShownFrame) return;
+  lastShownFrame = idx;
+  const sample   = frameTs[0].filename || "000001.png";
+  const padWidth = sample.split('.')[0].length;
+  const pad = n  => String(n).padStart(padWidth, '0');
+
+  const img = document.getElementById('frame-img');
+  img.src = `/data/${framesDir}/${pad(idx)}.png`;
+  const fi = document.getElementById('frame-info');
+  if (fi) fi.textContent = `(${idx}/${frameTs.length-1})`;
+}
+
+// ── Seek ───────────────────────────────────────────────────────────────────
+function seekTo(ms) {
+  currentMs = clamp(ms, minTs, maxTs);
+  autoFollow = true;
+  if (!playing) updateAutoFollow();
+  const frac = (currentMs-minTs)/(maxTs-minTs);
+  document.getElementById('scrubber').value = Math.round(frac*10000);
+  updateTimeDisplay(); syncFrame(); syncGPSDisplay(); buildTicks();
+  _lastVideoSync = currentMs;
+}
+
+function updateTimeDisplay() {
+  if (minTs===maxTs) { document.getElementById('time-disp').textContent='— / —'; return; }
+  const e=(currentMs-minTs)/1000, t=(maxTs-minTs)/1000;
+  const f=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${(s%60).toFixed(1).padStart(4,'0')}`;
+  document.getElementById('time-disp').textContent=`${f(e)} / ${f(t)}`;
+}
+
+function onScrub(v) {
+  if (minTs===maxTs) return;
+  seekTo(minTs + (v/10000)*(maxTs-minTs));
+}
+
+function seekPrev() {
+  if (!labels.length) return;
+  const sorted=[...labels].sort((a,b)=>a.start_ms-b.start_ms);
+  const prev=[...sorted].reverse().find(l=>l.start_ms<currentMs-100);
+  if (prev) seekTo(prev.start_ms);
+}
+function seekNext() {
+  if (!labels.length) return;
+  const sorted=[...labels].sort((a,b)=>a.start_ms-b.start_ms);
+  const next=sorted.find(l=>l.start_ms>currentMs+100);
+  if (next) seekTo(next.start_ms);
+}
+
+// ── Play / Pause ───────────────────────────────────────────────────────────
+function togglePlay() {
+  if (minTs===maxTs) return;
+  playing=!playing; autoFollow=true;
+  const btn=document.getElementById('btn-play');
+  btn.classList.toggle('playing',playing);
+  btn.textContent=playing?'⏸':'▶';
+  if (playing) _lastFrameT=0;
+}
+function setSpeed(v) { speed=parseFloat(v); }
+
+// ── Chart events ───────────────────────────────────────────────────────────
+function setupChartEvents(cv) {
+  cv.addEventListener('mousedown', e => {
+    if (minTs===maxTs) return;
+    const rect=cv.getBoundingClientRect();
+    const x=(e.clientX-rect.left)*cv.width/rect.width;
+    if (drawMode) {
+      dragStart=xToMs(x,cv.width); dragEnd=dragStart; isDragging=true;
+    } else {
+      isPanning=true; panStartX=e.clientX; panStartOff=viewOffsetMs;
+      autoFollow=false; cv.style.cursor='grabbing';
+      document.body.classList.add('pan-active');
+    }
+  });
+
+  cv.addEventListener('mousemove', e => {
+    if (minTs===maxTs) return;
+    if (isDragging) {
+      const rect=cv.getBoundingClientRect();
+      dragEnd=xToMs((e.clientX-rect.left)*cv.width/rect.width, cv.width);
+    } else if (isPanning) {
+      const dx=e.clientX-panStartX, wMs=effectiveWindow();
+      viewOffsetMs=clamp(panStartOff-(dx/cv.getBoundingClientRect().width)*wMs, minTs, Math.max(minTs,maxTs-wMs));
+      buildTicks();
+    }
+  });
+
+  cv.addEventListener('mouseup', e => {
+    const rect=cv.getBoundingClientRect();
+    const x=(e.clientX-rect.left)*cv.width/rect.width;
+    if (isDragging) {
+      isDragging=false;
+      const lo=Math.min(dragStart,dragEnd), hi=Math.max(dragStart,dragEnd);
+      if (hi-lo > 80) { pendingSel={start_ms:lo,end_ms:hi}; openPopup(lo,hi); }
+      dragStart=dragEnd=null;
+    } else if (isPanning) {
+      isPanning=false; cv.style.cursor=drawMode?'crosshair':'default';
+      document.body.classList.remove('pan-active');
+      if (Math.abs(e.clientX-panStartX)<4 && !drawMode)
+        seekTo(clamp(xToMs(x,cv.width),minTs,maxTs));
+    }
+  });
+
+  cv.addEventListener('mouseleave', () => {
+    if (isDragging) { isDragging=false; dragStart=dragEnd=null; }
+    if (isPanning)  { isPanning=false; cv.style.cursor=drawMode?'crosshair':'default'; document.body.classList.remove('pan-active'); }
+  });
+
+  cv.addEventListener('wheel', e => {
+    if (minTs===maxTs) return;
+    e.preventDefault();
+    const rect=cv.getBoundingClientRect();
+    const focalMs=xToMs((e.clientX-rect.left)*cv.width/rect.width, cv.width);
+    const factor=e.deltaY>0?1.25:0.8;
+    const newW=clamp(effectiveWindow()*factor, 500, maxTs-minTs);
+    setZoom(newW>(maxTs-minTs)*0.95?0:newW, focalMs);
+    buildTicks(); autoFollow=false;
+  }, { passive:false });
+}
+
+setupChartEvents(cvAccel);
+setupChartEvents(cvGyro);
+setupChartEvents(cvLinAcc);
+setupChartEvents(cvOrient);
+
+// ── Minimap ────────────────────────────────────────────────────────────────
+const minimapWrap=document.getElementById('minimap-wrap');
+minimapWrap.addEventListener('mousedown', e => {
+  if (minTs===maxTs) return;
+  const rect=minimapWrap.getBoundingClientRect();
+  seekTo(clamp(xToMsMM(e.clientX-rect.left,rect.width),minTs,maxTs));
+});
+minimapWrap.addEventListener('mousemove', e => {
+  if (e.buttons!==1||minTs===maxTs) return;
+  const rect=minimapWrap.getBoundingClientRect();
+  seekTo(clamp(xToMsMM(e.clientX-rect.left,rect.width),minTs,maxTs));
+});
+
+// ── Track click ────────────────────────────────────────────────────────────
+cvTrack.addEventListener('click', e => {
+  if (minTs===maxTs) return;
+  const rect=cvTrack.getBoundingClientRect();
+  const ms=xToMs((e.clientX-rect.left)*cvTrack.width/rect.width, cvTrack.width);
+  const hit=labels.find(l=>ms>=l.start_ms&&ms<=l.end_ms);
+  seekTo(hit?hit.start_ms:clamp(ms,minTs,maxTs));
+});
+
+// ── Draw mode ──────────────────────────────────────────────────────────────
+function toggleDraw() {
+  drawMode=!drawMode;
+  const pill=document.getElementById('draw-pill');
+  pill.classList.toggle('on',drawMode);
+  pill.textContent=drawMode?'⬡ Draw ON':'Draw';
+  document.getElementById('chart-hint').textContent=
+    drawMode?'drag to create label · scroll=zoom · [D] exit':'scroll=zoom · drag=pan · [D] draw labels';
+  [cvAccel,cvGyro,cvLinAcc,cvOrient].forEach(cv=>cv.style.cursor=drawMode?'crosshair':'default');
+}
+
+// ── Popup ──────────────────────────────────────────────────────────────────
+function openPopup(start, end) {
+  const dur=((end-start)/1000).toFixed(2), s=v=>(v/1000).toFixed(2);
+  document.getElementById('popup-range').textContent=`${s(start)}s → ${s(end)}s  ·  ${dur}s`;
+  document.getElementById('popup-input').value='';
+  document.getElementById('overlay').classList.add('show');
+  setTimeout(()=>document.getElementById('popup-input').focus(),30);
+}
+function closePopup() { document.getElementById('overlay').classList.remove('show'); pendingSel=null; }
+function onOverlayClick(e) { if (e.target===document.getElementById('overlay')) closePopup(); }
+function confirmPopup() {
+  const name=document.getElementById('popup-input').value.trim();
+  if (!name) { document.getElementById('popup-input').focus(); return; }
+  if (!pendingSel) return;
+  labels.push({id:labelId++,label:name,start_ms:pendingSel.start_ms,end_ms:pendingSel.end_ms});
+  labelColor(name); markDirty(); closePopup(); renderLabelList();
+}
+function popupKey(e) { if (e.key==='Enter') confirmPopup(); if (e.key==='Escape') closePopup(); }
+function setQ(name) { document.getElementById('popup-input').value=name; document.getElementById('popup-input').focus(); }
+
+// ── Label list ─────────────────────────────────────────────────────────────
+function renderLabelList() {
+  const list=document.getElementById('label-list'), empty=document.getElementById('label-empty');
+  list.querySelectorAll('.l-item').forEach(el=>el.remove());
+  const sorted=[...labels].sort((a,b)=>a.start_ms-b.start_ms);
+  document.getElementById('label-count').textContent=`(${sorted.length})`;
+  empty.style.display=sorted.length?'none':'block';
+  sorted.forEach(lbl=>{
+    const col=labelColor(lbl.label), dur=((lbl.end_ms-lbl.start_ms)/1000).toFixed(2), f=v=>(v/1000).toFixed(2);
+    const el=document.createElement('div'); el.className='l-item'; el.style.borderLeftColor=col;
+    el.innerHTML=`<div class="l-row"><span class="l-name" style="color:${col}">${lbl.label}</span>
+      <button class="l-del" onclick="deleteLabel(${lbl.id},event)">✕</button></div>
+      <div class="l-dur" style="color:${col}">${dur}s</div>
+      <div class="l-range">${f(lbl.start_ms)}s → ${f(lbl.end_ms)}s</div>`;
+    el.onclick=()=>seekTo(lbl.start_ms);
+    list.appendChild(el);
+  });
+}
+function deleteLabel(id,e) {
+  e.stopPropagation(); labels=labels.filter(l=>l.id!==id); markDirty(); renderLabelList();
+}
+function markDirty() {
+  dirty=true;
+  document.getElementById('save-btn').className='save-btn dirty';
+  document.getElementById('save-btn').textContent='Save Labels';
+  document.getElementById('save-btn').disabled=!session;
+}
+
+// ── Save ───────────────────────────────────────────────────────────────────
+async function saveLabels() {
+  if (!session) return;
+  const btn=document.getElementById('save-btn'); btn.textContent='Saving…';
+  try {
+    await fetch(`/session/${session.session_id}/labels`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(labels.map(l=>({
+        label:l.label, start_ms:Math.round(l.start_ms), end_ms:Math.round(l.end_ms),
+        duration_ms:Math.round(l.end_ms-l.start_ms)
+      })))
+    });
+    dirty=false; btn.textContent='✓ Saved'; btn.className='save-btn saved';
+    setTimeout(()=>{btn.textContent='Save Labels'; btn.className='save-btn';},2200);
+  } catch(err) {
+    btn.textContent='✗ Error';
+    setTimeout(()=>{btn.textContent='Save Labels'; btn.className='save-btn dirty';},2000);
+  }
+}
+
+// ── CSV parsing ────────────────────────────────────────────────────────────
+function parseCSV(text) {
+  const lines=text.trim().split('\n');
+  if (lines.length<2) return [];
+  const headers=lines[0].split(',').map(h=>h.trim());
+  return lines.slice(1).filter(Boolean).map(line=>{
+    const vals=line.split(','), obj={};
+    headers.forEach((h,i)=>{
+      const v=vals[i]?.trim();
+      obj[h]=(v!==undefined&&v!==''&&!isNaN(+v))?parseFloat(v):(v||'');
+    });
+    return obj;
+  });
+}
+async function fetchCSV(path) {
+  const rel=path.replace(/^data[\/\\]/,'');
+  return fetch(`/data/${rel}`).then(r=>r.text()).then(parseCSV).catch(()=>[]);
+}
+
+// ── Parse filtered IMU ─────────────────────────────────────────────────────
+function parseFilteredIMU(rows) {
+  if (!rows.length) return false;
+  const rawT0 = rows[0].t;
+  let tFactor = 1;
+  if (rawT0 > 1e9)       tFactor = 1/1000;
+  else if (rawT0 < 1e4)  tFactor = 1000;
+
+  filtTimestamps  = rows.map(r => r.t * tFactor);
+  filtGyroChans   = [rows.map(r=>r.gx), rows.map(r=>r.gy), rows.map(r=>r.gz)];
+  filtAccelChans  = [rows.map(r=>r.ax), rows.map(r=>r.ay), rows.map(r=>r.az)];
+  filtLinAccChans = [rows.map(r=>r.alin_x), rows.map(r=>r.alin_y), rows.map(r=>r.alin_z)];
+  filtOrientChans = [rows.map(r=>r.roll), rows.map(r=>r.pitch), rows.map(r=>r.yaw)];
+
+  filtAccelScale  = computeScale(filtAccelChans,  channelVisible.accel);
+  filtGyroScale   = computeScale(filtGyroChans,   channelVisible.gyro);
+  filtLinAccScale = computeScale(filtLinAccChans, channelVisible.linacc);
+  filtOrientScale = computeScale(filtOrientChans, channelVisible.orient);
+
+  console.log('✅ Filtered IMU loaded:', filtTimestamps.length, 'rows');
+  return true;
+}
+
+// ── Session list ───────────────────────────────────────────────────────────
+async function loadSessions() {
+  const list=document.getElementById('session-list');
+  try {
+    const data=await fetch('/sessions').then(r=>r.json());
+    list.innerHTML='';
+    document.getElementById('session-count').textContent=`(${data.length})`;
+    if (!data.length) { list.innerHTML='<div class="empty-hint">No sessions found</div>'; return; }
+    data.forEach(s=>{
+      const el=document.createElement('div'); el.className='s-item';
+      el.innerHTML=`<div class="s-name">${s.session_id}</div>
+        <div class="s-badges">
+          <span class="badge ${s.gps?'ok':''}">GPS</span>
+          <span class="badge ${s.video?'ok':''}">VID</span>
+          <span class="badge ${s.labels?'ok':''}">LBL</span>
+          <span class="badge ${s.imu?'ok':''}">IMU</span>
+          <span class="badge ${s.imu_filtered?'ok':''}">FILT</span>
+        </div>`;
+      el.onclick=()=>loadSession(s,el);
+      list.appendChild(el);
+    });
+  } catch(e) { list.innerHTML='<div class="empty-hint">Cannot reach server</div>'; }
+}
+
+// ── Load session ───────────────────────────────────────────────────────────
+async function loadSession(s, el) {
+  playing=false;
+  document.getElementById('btn-play').classList.remove('playing');
+  document.getElementById('btn-play').textContent='▶';
+  document.querySelectorAll('.s-item').forEach(i=>i.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('loading').classList.add('show');
+
+  // Reset autoscale & visibility
+  autoScaleChart = { accel: false, gyro: false, linacc: false, orient: false };
+  ['accel','gyro','linacc','orient'].forEach(name => {
+    channelVisible[name] = [true, true, true];
+    // Reset button states
+    for (let i = 0; i < 3; i++) {
+      const btn = document.getElementById(`ch-${name}-${i}`);
+      if (btn) btn.classList.add('active');
+    }
+  });
+
+  try {
+    if (!s.imu) throw new Error('No IMU data');
+    imuData=await fetchCSV(s.imu);
+    if (!imuData.length) throw new Error('IMU CSV empty');
+
+    minTs=imuData[0].timestamp_ms;
+    maxTs=imuData[imuData.length-1].timestamp_ms;
+    timestamps  = imuData.map(r=>r.timestamp_ms);
+    accelChans  = [imuData.map(r=>r.accel_x), imuData.map(r=>r.accel_y), imuData.map(r=>r.accel_z)];
+    gyroChans   = [imuData.map(r=>r.gyro_x),  imuData.map(r=>r.gyro_y),  imuData.map(r=>r.gyro_z)];
+    accelScale  = computeScale(accelChans);
+    gyroScale   = computeScale(gyroChans);
+
+    hasFiltered = false;
+    filtTimestamps = []; filtAccelChans = [[],[],[]]; filtGyroChans = [[],[],[]];
+    filtLinAccChans = [[],[],[]]; filtOrientChans = [[],[],[]];
+    filtAccelScale = filtGyroScale = filtLinAccScale = filtOrientScale = null;
+
+    if (s.imu_filtered) {
+      const fData = await fetchCSV(s.imu_filtered);
+      if (fData.length) hasFiltered = parseFilteredIMU(fData);
+    }
+
+    document.getElementById('src-filtered').disabled = !hasFiltered;
+    setImuSource('raw');
+
+    viewOffsetMs=minTs; autoFollow=true;
+    windowMs=(maxTs-minTs)<=12000?0:10000;
+    document.getElementById('zoom-sel').value=windowMs===0?'0':String(windowMs);
+
+    gpsData=s.gps?await fetchCSV(s.gps):[];
+    document.getElementById('gps-nofix').style.display=gpsData.length?'none':'flex';
+    if (!gpsData.length) ['gv-lat','gv-lon','gv-spd','gv-alt'].forEach(id=>setText(id,'—',true));
+
+    frameTs = []; framesDir = null; lastShownFrame = -1;
+    if (s.frames_dir && s.frame_ts) {
+      const rawFt = await fetchCSV(s.frame_ts);
+      if (rawFt.length) {
+        const camT0 = rawFt[0].timestamp_ms, imuT0 = minTs;
+        frameTs = rawFt.map(r => ({
+          frame_idx: Math.round(r.frame_idx),
+          timestamp_ms: r.timestamp_ms - camT0 + imuT0
+        }));
+        framesDir = s.frames_dir;
+      }
+    }
+
+    Object.keys(colorMap).forEach(k=>delete colorMap[k]);
+    colorIdx=0; labelId=0;
+    if (s.labels) {
+      const raw=await fetchCSV(s.labels);
+      labels=raw.map((r,i)=>({id:i,label:r.label,start_ms:r.start_ms,end_ms:r.end_ms}));
+      labelId=labels.length; labels.forEach(l=>labelColor(l.label));
+    } else { labels=[]; }
+
+    const img = document.getElementById('frame-img');
+    if (framesDir) {
+      img.style.display = 'block';
+      document.getElementById('vid-nosig').style.display = 'none';
+    } else {
+      img.style.display = 'none';
+      document.getElementById('vid-nosig').style.display = 'flex';
+    }
+
+    session=s; dirty=false; currentMs=minTs;
+    document.getElementById('scrubber').disabled=false;
+    document.getElementById('scrubber').value=0;
+    ['btn-play','btn-prev','btn-next'].forEach(id=>document.getElementById(id).disabled=false);
+    document.getElementById('save-btn').disabled=false;
+    document.getElementById('save-btn').className='save-btn';
+    document.getElementById('save-btn').textContent='Save Labels';
+    document.getElementById('session-title').innerHTML=`Session: <span class="sid">${s.session_id}</span>`;
+
+    updateAutoscaleButtons();
+    seekTo(minTs); buildTicks(); renderLabelList();
+    drawMinimap(); updateWindowInfo(); updateMinimapOverlay();
+
+  } catch(err) {
+    console.error('[loadSession]',err);
+    document.getElementById('session-title').textContent=`Error: ${err.message}`;
+  } finally {
+    document.getElementById('loading').classList.remove('show');
+  }
+}
+
+// ── Keyboard shortcuts ─────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
+  if (e.code==='Space')  { e.preventDefault(); togglePlay(); }
+  if (e.code==='KeyD')   { toggleDraw(); }
+  if ((e.ctrlKey||e.metaKey)&&e.code==='KeyS') { e.preventDefault(); saveLabels(); }
+  if (e.code==='ArrowLeft')  { e.preventDefault(); seekTo(currentMs-500); }
+  if (e.code==='ArrowRight') { e.preventDefault(); seekTo(currentMs+500); }
+  if (e.code==='Comma')  seekPrev();
+  if (e.code==='Period') seekNext();
+  if (e.code==='Escape') closePopup();
+  if (e.code==='Equal'||e.code==='NumpadAdd') {
+    setZoom(Math.max(effectiveWindow()*0.7,500),currentMs); buildTicks(); autoFollow=false;
+  }
+  if (e.code==='Minus'||e.code==='NumpadSubtract') {
+    const newW=effectiveWindow()*1.4;
+    setZoom(newW>(maxTs-minTs)*0.95?0:newW,currentMs); buildTicks(); autoFollow=false;
+  }
+  if (e.code==='KeyF') { autoFollow=true; updateAutoFollow(); buildTicks(); }
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+buildAllLegends(); // Build toggle buttons immediately
+resize();
+_raf = requestAnimationFrame(mainLoop);
+loadSessions();
+</script>
+</body>
+</html>
