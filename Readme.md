@@ -93,15 +93,15 @@ IMU Lab is a browser-based tool designed for exploring, visualizing, and annotat
 ```
 data/
 └── sessions/
-└── [session_id]/
-├── imu.csv # Raw IMU data
-├── filtered_imu.csv # Filtered IMU data (optional)
-├── gps.csv # GPS trajectory data (optional)
-├── frame_timestamps.csv # Video frame index (optional)
-└── frames/ # Video frame images (optional)
-├── 000001.png
-├── 000002.png
-└── ...
+    └── [session_id]/
+        ├── imu.csv # Raw IMU data
+        ├── filtered_imu.csv # Filtered IMU data (optional)
+        ├── gps.csv # GPS trajectory data (optional)
+        ├── frame_timestamps.csv # Video frame index (optional)
+        └── frames/ # Video frame images (optional)
+            ├── 000001.png
+            ├── 000002.png
+            └── ...
 ```
 
 ### IMU CSV Format

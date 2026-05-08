@@ -33,7 +33,7 @@ def sessions():
         for fname in os.listdir(path):
             fp = os.path.join(path, fname)
             if   fname == "imu.csv":                              files["imu"]          = fp
-            elif fname == "filtered_imu.csv":                     files["imu_filtered"] = fp
+            elif fname == "imu_filtered.csv":                     files["imu_filtered"] = fp
             elif fname == "gps.csv":                              files["gps"]          = fp
             elif fname == "fixed_video.mp4":                      files["video"]        = fp
             elif fname == "video_frame_timestamps.csv":           files["frame_ts"]     = fp
