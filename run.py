@@ -41,33 +41,43 @@ def index():
 
 @app.route("/session/<session_id>/frame/<int:frame_idx>")
 def get_frame(session_id, frame_idx):
-    """Extract a specific frame by index directly from video — no temp files."""
-    print('okkk')
+    """Extract a specific frame directly from video (thread-safe)."""
 
-    cap = get_cap(session_id)
+    video_path = os.path.join(DATA_DIR, session_id, "video.mp4")
 
-    if cap is None:
+    if not os.path.exists(video_path):
         abort(404, "Video not found")
 
+    cap = cv2.VideoCapture(video_path)
+
+    if not cap.isOpened():
+        abort(500, "Could not open video")
+
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
     if frame_idx < 0 or frame_idx >= total:
+        cap.release()
         abort(400, f"Frame {frame_idx} out of range (0–{total-1})")
 
+    # Seek frame
     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
     ret, frame = cap.read()
-    if not ret:
+
+    cap.release()  # 🔥 ALWAYS release immediately
+
+    if not ret or frame is None:
         abort(500, "Could not decode frame")
 
-    # Encode directly into memory — no disk touch at all
+    # Encode in memory (no disk)
     ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+
     if not ok:
         abort(500, "JPEG encode failed")
-
 
     return send_file(
         io.BytesIO(buf.tobytes()),
         mimetype="image/jpeg",
-        max_age=0           # don't let the browser cache stale frames
+        max_age=0
     )
 
 
