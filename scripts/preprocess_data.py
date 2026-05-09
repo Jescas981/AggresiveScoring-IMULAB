@@ -55,7 +55,7 @@ for session in sessions:
 
     print(f"\n🚀 Processing {session}")
 
-    os.makedirs(FRAMES_DIR, exist_ok=True)
+    # os.makedirs(FRAMES_DIR, exist_ok=True)
 
 
     # ─────────────────────────────
@@ -123,17 +123,17 @@ for session in sessions:
     # VIDEO (INDEPENDENT)
     # ─────────────────────────────
 
-    if not (os.path.exists(FRAMES_DIR) and len(os.listdir(FRAMES_DIR)) > 0):
+    # if not (os.path.exists(FRAMES_DIR) and len(os.listdir(FRAMES_DIR)) > 0):
 
-        video_proc = VideoProcessor(
-            video_path=VIDEO_PATH,
-            out_dir=FRAMES_DIR
-        )
+    #     video_proc = VideoProcessor(
+    #         video_path=VIDEO_PATH,
+    #         out_dir=FRAMES_DIR
+    #     )
 
-        frame_df = video_proc.extract()
+    #     frame_df = video_proc.extract()
 
-    else:
-        print(f"[SKIP] frames already exist: {session}")
+    # else:
+    #     print(f"[SKIP] frames already exist: {session}")
 
 
     # ─────────────────────────────

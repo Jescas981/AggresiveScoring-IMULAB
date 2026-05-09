@@ -758,7 +758,7 @@ function mainLoop(t) {
 
     const frac = (currentMs - minTs) / (maxTs - minTs);
     document.getElementById('scrubber').value = Math.round(frac * 10000);
-    updateTimeDisplay();
+    updateTimeDisplay();  
 
     if (Math.abs(currentMs - _lastVideoSync) > 80) {
       syncGPSDisplay(); syncFrame(); _lastVideoSync = currentMs;
@@ -1105,26 +1105,28 @@ function setText(id, val, isNone) {
 
 // ── Frame sync ─────────────────────────────────────────────────────────────
 function syncFrame() {
-  if (!frameTs.length || !framesDir) return;
+  if (!frameTs.length) return;
+
   let lo = 0, hi = frameTs.length - 1;
   while (lo < hi) {
     const m = (lo + hi + 1) >> 1;
     frameTs[m].timestamp_ms <= currentMs ? lo = m : hi = m - 1;
   }
-
   const idx = frameTs[lo].frame_idx;
+  
   if (idx === lastShownFrame) return;
   lastShownFrame = idx;
-  const sample   = frameTs[0].filename || "000001.png";
-  const padWidth = sample.split('.')[0].length;
-  const pad = n  => String(n).padStart(padWidth, '0');
 
   const img = document.getElementById('frame-img');
-  img.src = `/data/${framesDir}/${pad(idx)}.png`;
-  const fi = document.getElementById('frame-info');
-  if (fi) fi.textContent = `(${idx}/${frameTs.length-1})`;
+  if (session && session.has_video) {
+    img.src = `/session/${session.session_id}/frame/${idx}`;
+    img.style.display = 'block';
+    document.getElementById('vid-nosig').style.display = 'none';
+  } else {
+    img.style.display = 'none';
+    document.getElementById('vid-nosig').style.display = 'flex';
+  }
 }
-
 // ── Seek ───────────────────────────────────────────────────────────────────
 function seekTo(ms) {
   currentMs = clamp(ms, minTs, maxTs);
@@ -1393,7 +1395,7 @@ async function loadSessions() {
       el.innerHTML=`<div class="s-name">${s.session_id}</div>
         <div class="s-badges">
           <span class="badge ${s.gps?'ok':''}">GPS</span>
-          <span class="badge ${s.video?'ok':''}">VID</span>
+          <span class="badge ${s.has_video?'ok':''}">VID</span>
           <span class="badge ${s.labels?'ok':''}">LBL</span>
           <span class="badge ${s.imu?'ok':''}">IMU</span>
           <span class="badge ${s.imu_filtered?'ok':''}">FILT</span>
@@ -1459,7 +1461,7 @@ async function loadSession(s, el) {
     if (!gpsData.length) ['gv-lat','gv-lon','gv-spd','gv-alt'].forEach(id=>setText(id,'—',true));
 
     frameTs = []; framesDir = null; lastShownFrame = -1;
-    if (s.frames_dir && s.frame_ts) {
+    if (s.frame_ts) {
       const rawFt = await fetchCSV(s.frame_ts);
       if (rawFt.length) {
         const camT0 = rawFt[0].timestamp_ms, imuT0 = minTs;
@@ -1467,7 +1469,6 @@ async function loadSession(s, el) {
           frame_idx: Math.round(r.frame_idx),
           timestamp_ms: r.timestamp_ms - camT0 + imuT0
         }));
-        framesDir = s.frames_dir;
       }
     }
 
