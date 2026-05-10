@@ -31,7 +31,6 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--mono); font-size: 12px; }
 
-/* ── Header ── */
 header {
   height: 44px; background: var(--s1); border-bottom: 1px solid var(--border);
   display: flex; align-items: center; gap: 10px; padding: 0 12px; flex-shrink: 0;
@@ -62,7 +61,6 @@ header {
 .speed-sel:focus, .zoom-sel:focus { outline: none; border-color: var(--amber); }
 .zoom-label { font-size: 8px; color: var(--dim); white-space: nowrap; }
 
-/* ── IMU source toggle ── */
 .src-group { display: flex; gap: 0; flex-shrink: 0; }
 .src-btn {
   padding: 4px 9px; background: var(--s3); border: 1px solid var(--border);
@@ -89,10 +87,8 @@ header {
   50%      { box-shadow: 0 0 10px 2px #f59e0b35; }
 }
 
-/* ── Main layout ── */
 .app-body { display: flex; height: calc(100vh - 44px - 76px); overflow: hidden; }
 
-/* ── Left sidebar ── */
 .sidebar {
   width: 190px; flex-shrink: 0; border-right: 1px solid var(--border);
   display: flex; flex-direction: column; overflow: hidden; background: var(--s1);
@@ -124,10 +120,7 @@ header {
 }
 .draw-pill:hover { border-color: var(--border2); color: var(--text); }
 .draw-pill.on { background: #f59e0b14; border-color: var(--amber); color: var(--amber); }
-.label-list {
-  overflow-y: auto; flex: 1; padding: 5px; display: flex; flex-direction: column;
-  gap: 2px; min-height: 60px;
-}
+.label-list { overflow-y: auto; flex: 1; padding: 5px; display: flex; flex-direction: column; gap: 2px; min-height: 60px; }
 .label-list::-webkit-scrollbar { width: 3px; }
 .label-list::-webkit-scrollbar-thumb { background: var(--border2); }
 .l-item {
@@ -146,7 +139,6 @@ header {
 .l-item:hover .l-del { opacity: 1; }
 .empty-hint { text-align: center; color: var(--muted); font-size: 8px; text-transform: uppercase; letter-spacing: 2px; padding: 14px 8px; line-height: 2.4; }
 
-/* ── Center charts ── */
 .center {
   flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden;
   border-right: 1px solid var(--border);
@@ -154,65 +146,49 @@ header {
 .charts-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
 .chart-row { flex: 1; position: relative; border-bottom: 1px solid var(--border); min-height: 0; overflow: hidden; }
 .chart-label { position: absolute; top: 6px; left: 10px; font-size: 8px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); pointer-events: none; z-index: 2; }
-.chart-legend { 
-  position: absolute; top: 4px; right: 8px; display: flex; gap: 4px; 
+.chart-legend {
+  position: absolute; top: 4px; right: 8px; display: flex; gap: 4px;
   z-index: 3; align-items: center; flex-wrap: wrap; max-width: 70%;
   justify-content: flex-end;
 }
 
-/* ── Channel toggle buttons ── */
+/* ── Accel mode toggle (Filt / Lin) ── */
+.accel-mode-group { display: none; gap: 0; flex-shrink: 0; margin-left: 2px; align-items: center; }
+.accel-mode-btn {
+  padding: 2px 7px; background: var(--s3); border: 1px solid var(--border);
+  color: var(--dim); font-family: var(--mono); font-size: 7px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: all .12s;
+  margin-left: -1px; position: relative; line-height: 1.6; pointer-events: all;
+}
+.accel-mode-btn:first-child { margin-left: 0; }
+.accel-mode-btn:hover { border-color: var(--border2); color: var(--text); z-index: 1; }
+.accel-mode-btn.active { background: #38bdf818; border-color: var(--cyan); color: var(--cyan); z-index: 2; }
+.accel-mode-sep { width: 1px; height: 14px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
+
 .channel-toggle {
-  pointer-events: all;
-  cursor: pointer;
-  padding: 2px 7px;
-  font-size: 7px;
-  font-weight: 700;
-  border: 1px solid currentColor;
-  background: transparent;
-  color: inherit;
-  font-family: var(--mono);
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
+  pointer-events: all; cursor: pointer; padding: 2px 7px; font-size: 7px; font-weight: 700;
+  border: 1px solid currentColor; background: transparent; color: inherit;
+  font-family: var(--mono); letter-spacing: 0.8px; text-transform: uppercase;
   transition: opacity 0.15s, background 0.15s, transform 0.1s;
-  opacity: 0.35;
-  line-height: 1.6;
-  user-select: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0;
+  opacity: 0.35; line-height: 1.6; user-select: none; display: inline-flex; align-items: center; gap: 0;
 }
-.channel-toggle.active {
-  opacity: 1;
-  background: color-mix(in srgb, currentColor 14%, transparent);
-}
+.channel-toggle.active { opacity: 1; background: color-mix(in srgb, currentColor 14%, transparent); }
 .channel-toggle:hover { opacity: 0.75; transform: scale(1.05); }
 .channel-toggle.active:hover { opacity: 0.85; }
 
-/* ── Live value readout inside legend button ── */
-.ch-label {
-  font-weight: 700;
-  letter-spacing: 0.8px;
-}
+.ch-label { font-weight: 700; letter-spacing: 0.8px; }
 .ch-val {
-  font-size: 8px;
-  font-weight: 400;
-  letter-spacing: 0;
-  margin-left: 4px;
-  font-variant-numeric: tabular-nums;
-  opacity: 0.85;
-  min-width: 52px;
-  text-align: left;
+  font-size: 8px; font-weight: 400; letter-spacing: 0; margin-left: 4px;
+  font-variant-numeric: tabular-nums; opacity: 0.85; min-width: 52px; text-align: left;
 }
 
 .window-info {
   position: absolute; bottom: 22px; right: 8px; font-size: 8px; color: var(--dim);
-  pointer-events: none; z-index: 2; letter-spacing: .5px;
-  background: #060810bb; padding: 1px 5px;
+  pointer-events: none; z-index: 2; letter-spacing: .5px; background: #060810bb; padding: 1px 5px;
 }
 canvas.cv { display: block; width: 100% !important; height: 100% !important; }
 .track-row { flex: 0 0 44px; border-top: 1px solid var(--border); position: relative; overflow: hidden; }
 
-/* ── Right sidebar ── */
 .right-sidebar {
   width: 200px; flex-shrink: 0; display: flex; flex-direction: column;
   overflow: hidden; background: var(--s1);
@@ -231,7 +207,6 @@ canvas#cv-gps { display: block; }
 .gv-val { font-size: 10px; font-weight: 500; color: var(--gps); }
 .gv-val.none { color: var(--muted); }
 
-/* ── Transport bar ── */
 .transport {
   height: 76px; background: var(--s1); border-top: 1px solid var(--border);
   padding: 6px 14px 6px; display: flex; flex-direction: column; gap: 3px; flex-shrink: 0;
@@ -248,10 +223,7 @@ canvas#cv-minimap { display: block; position: absolute; inset: 0; width: 100%; h
   border-right: 1px solid rgba(245,158,11,0.6);
   pointer-events: none;
 }
-.minimap-cursor {
-  position: absolute; top: 0; width: 1.5px; height: 100%;
-  background: rgba(255,255,255,0.7); pointer-events: none;
-}
+.minimap-cursor { position: absolute; top: 0; width: 1.5px; height: 100%; background: rgba(255,255,255,0.7); pointer-events: none; }
 input[type=range].scrubber {
   -webkit-appearance: none; width: 100%; height: 3px; background: var(--border2);
   border-radius: 0; outline: none; cursor: pointer; transition: background .15s;
@@ -264,7 +236,6 @@ input[type=range].scrubber::-webkit-slider-thumb:hover { transform: scale(1.25);
 input[type=range].scrubber:disabled { opacity: .3; cursor: not-allowed; }
 .tick-row { display: flex; justify-content: space-between; font-size: 8px; color: var(--muted); pointer-events: none; }
 
-/* ── Label popup ── */
 .overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 100;
   display: none; align-items: center; justify-content: center;
@@ -302,14 +273,12 @@ input[type=range].scrubber:disabled { opacity: .3; cursor: not-allowed; }
 .btn-cancel { background: transparent; border-color: var(--border2); color: var(--dim); }
 .btn-cancel:hover { border-color: var(--text); color: var(--text); }
 
-/* ── Loading ── */
 .loading { position: fixed; inset: 0; background: #060810cc; z-index: 200; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 10px; }
 .loading.show { display: flex; }
 .loading-text { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: var(--amber); }
 .spinner { width: 22px; height: 22px; border: 2px solid var(--border2); border-top-color: var(--amber); border-radius: 50%; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Keyboard hint ── */
 .kbd-hint {
   font-size: 8px; color: var(--muted); white-space: nowrap;
   position: fixed; bottom: 82px; right: 12px; letter-spacing: .5px; pointer-events: none;
@@ -373,8 +342,8 @@ input[type=range].scrubber:disabled { opacity: .3; cursor: not-allowed; }
     <option value="0">All</option>
   </select>
   <div class="src-group" id="src-group">
-    <button class="src-btn active" id="src-raw"      onclick="setImuSource('raw')"      title="Raw IMU">Raw</button>
-    <button class="src-btn"        id="src-filtered"  onclick="setImuSource('filtered')"  title="Filtered IMU" disabled>Filt</button>
+    <button class="src-btn active" id="src-raw"      onclick="setImuSource('raw')"     title="Raw IMU">Raw</button>
+    <button class="src-btn"        id="src-filtered"  onclick="setImuSource('filtered')" title="Filtered IMU" disabled>Filt</button>
   </div>
   <button class="save-btn" id="save-btn" onclick="saveLabels()" disabled>Save Labels</button>
 </header>
@@ -400,7 +369,7 @@ input[type=range].scrubber:disabled { opacity: .3; cursor: not-allowed; }
     </div>
     <div class="charts-area">
 
-      <!-- Row 1: Accelerometer -->
+      <!-- Row 1: Accelerometer (Filt/Lin toggle in legend) -->
       <div class="chart-row" id="row-accel">
         <div class="chart-label" id="lbl-accel">Accelerometer · m/s²</div>
         <div class="chart-legend" id="legend-accel"></div>
@@ -415,18 +384,18 @@ input[type=range].scrubber:disabled { opacity: .3; cursor: not-allowed; }
         <canvas class="cv" id="cv-gyro"></canvas>
       </div>
 
-      <!-- Row 3: Linear Acceleration -->
-      <div class="chart-row" id="row-linacc" style="display:none;">
-        <div class="chart-label">Linear Accel · m/s²</div>
-        <div class="chart-legend" id="legend-linacc"></div>
-        <canvas class="cv" id="cv-linacc"></canvas>
-      </div>
-
-      <!-- Row 4: Orientation -->
+      <!-- Row 3: Orientation (filtered mode only) -->
       <div class="chart-row" id="row-orient" style="display:none;">
         <div class="chart-label">Orientation · rad</div>
         <div class="chart-legend" id="legend-orient"></div>
         <canvas class="cv" id="cv-orient"></canvas>
+      </div>
+
+      <!-- Row 4: GPS Speed (replaces linear acc) -->
+      <div class="chart-row" id="row-gpsspeed" style="display:none;">
+        <div class="chart-label">GPS Speed · m/s</div>
+        <div class="chart-legend" id="legend-gpsspeed"></div>
+        <canvas class="cv" id="cv-gpsspeed"></canvas>
       </div>
 
       <!-- Label track -->
@@ -480,964 +449,943 @@ const ACCEL_COLORS  = ['#38bdf8','#34d399','#f87171'];
 const GYRO_COLORS   = ['#fbbf24','#a78bfa','#fb923c'];
 const LINACC_COLORS = ['#67e8f9','#4ade80','#e879f9'];
 const ORIENT_COLORS = ['#f59e0b','#38bdf8','#a78bfa'];
+const GPS_SPD_COLOR = '#4ade80';
 
 const CHANNEL_NAMES = {
-  accel:  ['X', 'Y', 'Z'],
-  gyro:   ['X', 'Y', 'Z'],
-  linacc: ['X', 'Y', 'Z'],
-  orient: ['Roll', 'Pitch', 'Yaw'],
+  accel:  ['X','Y','Z'], gyro: ['X','Y','Z'],
+  linacc: ['X','Y','Z'], orient: ['Roll','Pitch','Yaw'],
 };
 const CHANNEL_COLORS = {
-  accel:  ACCEL_COLORS,
-  gyro:   GYRO_COLORS,
-  linacc: LINACC_COLORS,
-  orient: ORIENT_COLORS,
+  accel: ACCEL_COLORS, gyro: GYRO_COLORS,
+  linacc: LINACC_COLORS, orient: ORIENT_COLORS,
 };
 
-// ── Channel visibility state ───────────────────────────────────────────────
 const channelVisible = {
-  accel:  [true, true, true],
-  gyro:   [true, true, true],
-  linacc: [true, true, true],
-  orient: [true, true, true],
+  accel: [true,true,true], gyro: [true,true,true],
+  linacc: [true,true,true], orient: [true,true,true],
 };
 
-// ── Toggle a single channel ────────────────────────────────────────────────
+// ── Accel display mode: 'filtered' | 'linear' (only in filtered IMU source) ─
+let accelMode = 'filtered';
+
+function setAccelMode(mode) {
+  accelMode = mode;
+  document.getElementById('accel-mode-filt').classList.toggle('active', mode === 'filtered');
+  document.getElementById('accel-mode-lin').classList.toggle('active', mode === 'linear');
+  
+  if (imuSource === 'filtered') {
+    document.getElementById('lbl-accel').textContent =
+      mode === 'linear' ? 'Linear Accel · m/s²' : 'Accel (filtered) · m/s²';
+    
+    // Actualizar el botón Auto para que refleje qué escala está controlando
+    const autoBtn = document.getElementById('autoscale-accel');
+    if (autoBtn) {
+      if (mode === 'linear') {
+        autoBtn.classList.toggle('on', autoScaleChart.linacc);
+        autoBtn.textContent = autoScaleChart.linacc ? '⦿ Auto' : 'Auto';
+      } else {
+        autoBtn.classList.toggle('on', autoScaleChart.accel);
+        autoBtn.textContent = autoScaleChart.accel ? '⦿ Auto' : 'Auto';
+      }
+    }
+  }
+}
+
 function toggleChannel(chartName, idx) {
   channelVisible[chartName][idx] = !channelVisible[chartName][idx];
   const btn = document.getElementById(`ch-${chartName}-${idx}`);
   if (btn) btn.classList.toggle('active', channelVisible[chartName][idx]);
 }
 
-// ── Build legend toggle buttons (now with live value span) ─────────────────
+// ── Build accel legend: [Filt|Lin] separator [X][Y][Z] [Auto] ─────────────
+function buildAccelLegend() {
+  const legend = document.getElementById('legend-accel');
+  legend.innerHTML = '';
+
+  // Filt / Lin mode group (hidden until filtered IMU source active)
+  const modeGroup = document.createElement('div');
+  modeGroup.className = 'accel-mode-group';
+  modeGroup.id = 'accel-mode-group';
+
+  const mFilt = document.createElement('button');
+  mFilt.id = 'accel-mode-filt'; mFilt.className = 'accel-mode-btn active';
+  mFilt.textContent = 'Filt'; mFilt.title = 'Show filtered accelerometer';
+  mFilt.addEventListener('click', e => { e.stopPropagation(); setAccelMode('filtered'); });
+
+  const mLin = document.createElement('button');
+  mLin.id = 'accel-mode-lin'; mLin.className = 'accel-mode-btn';
+  mLin.textContent = 'Lin'; mLin.title = 'Show linear acceleration';
+  mLin.addEventListener('click', e => { e.stopPropagation(); setAccelMode('linear'); });
+
+  modeGroup.appendChild(mFilt);
+  modeGroup.appendChild(mLin);
+  legend.appendChild(modeGroup);
+
+  // Separator line
+  const sep = document.createElement('div');
+  sep.className = 'accel-mode-sep';
+  legend.appendChild(sep);
+
+  // XYZ channel toggles
+  ACCEL_COLORS.forEach((color, i) => {
+    const btn = document.createElement('button');
+    btn.id = `ch-accel-${i}`; btn.className = 'channel-toggle active';
+    btn.style.color = color;
+    btn.innerHTML = `<span class="ch-label">${CHANNEL_NAMES.accel[i]}</span><span class="ch-val" id="val-accel-${i}"> —</span>`;
+    btn.addEventListener('click', e => { e.stopPropagation(); toggleChannel('accel', i); });
+    legend.appendChild(btn);
+  });
+
+  // Autoscale
+  const aBtn = document.createElement('button');
+  aBtn.id = 'autoscale-accel'; aBtn.className = 'draw-pill';
+  aBtn.style.cssText = 'margin-left:4px; pointer-events:all;';
+  aBtn.textContent = 'Auto';
+  aBtn.addEventListener('click', e => { e.stopPropagation(); toggleAutoScale('accel'); });
+  legend.appendChild(aBtn);
+}
+
+// ── Standard legend builder ────────────────────────────────────────────────
 function buildLegend(chartName) {
   const legend = document.getElementById(`legend-${chartName}`);
   if (!legend) return;
   legend.innerHTML = '';
-  const names  = CHANNEL_NAMES[chartName];
-  const colors = CHANNEL_COLORS[chartName];
+  const names = CHANNEL_NAMES[chartName], colors = CHANNEL_COLORS[chartName];
   names.forEach((name, i) => {
     const btn = document.createElement('button');
-    btn.id        = `ch-${chartName}-${i}`;
-    btn.className = 'channel-toggle active';
+    btn.id = `ch-${chartName}-${i}`; btn.className = 'channel-toggle active';
     btn.style.color = colors[i];
-    // ── label + live value readout ──
     btn.innerHTML = `<span class="ch-label">${name}</span><span class="ch-val" id="val-${chartName}-${i}"> —</span>`;
-    btn.title = `Toggle ${name} channel`;
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      toggleChannel(chartName, i);
-    });
+    btn.addEventListener('click', e => { e.stopPropagation(); toggleChannel(chartName, i); });
     legend.appendChild(btn);
   });
-
-  // Autoscale button
   const aBtn = document.createElement('button');
-  aBtn.id        = `autoscale-${chartName}`;
-  aBtn.className = 'draw-pill';
+  aBtn.id = `autoscale-${chartName}`; aBtn.className = 'draw-pill';
   aBtn.style.cssText = 'margin-left:4px; pointer-events:all;';
-  aBtn.textContent   = 'Auto';
+  aBtn.textContent = 'Auto';
   aBtn.addEventListener('click', e => { e.stopPropagation(); toggleAutoScale(chartName); });
   legend.appendChild(aBtn);
 }
 
+// ── GPS Speed legend ───────────────────────────────────────────────────────
+function buildGpsSpeedLegend() {
+  const legend = document.getElementById('legend-gpsspeed');
+  if (!legend) return;
+  legend.innerHTML = '';
+  const badge = document.createElement('button');
+  badge.className = 'channel-toggle active'; badge.style.color = GPS_SPD_COLOR;
+  badge.style.cursor = 'default';
+  badge.innerHTML = `<span class="ch-label">Speed</span><span class="ch-val" id="val-gpsspeed"> —</span>`;
+  legend.appendChild(badge);
+  const aBtn = document.createElement('button');
+  aBtn.id = 'autoscale-gpsspeed'; aBtn.className = 'draw-pill';
+  aBtn.style.cssText = 'margin-left:4px; pointer-events:all;';
+  aBtn.textContent = 'Auto';
+  aBtn.addEventListener('click', e => { e.stopPropagation(); toggleAutoScale('gpsspeed'); });
+  legend.appendChild(aBtn);
+}
+
 function buildAllLegends() {
-  buildLegend('accel');
+  buildAccelLegend();
   buildLegend('gyro');
-  buildLegend('linacc');
   buildLegend('orient');
+  buildGpsSpeedLegend();
   updateAutoscaleButtons();
 }
 
-// ── Interpolate a channel value at currentMs ───────────────────────────────
+// ── Interpolation ──────────────────────────────────────────────────────────
 function interpolateAtMs(ch, tsArr, ms) {
-  if (!ch || !ch.length || !tsArr || !tsArr.length) return null;
-  if (ms <= tsArr[0])  return ch[0];
-  if (ms >= tsArr[tsArr.length - 1]) return ch[ch.length - 1];
-  // binary search for bracket
-  let lo = 0, hi = tsArr.length - 1;
-  while (lo < hi) {
-    const m = (lo + hi + 1) >> 1;
-    tsArr[m] <= ms ? lo = m : hi = m - 1;
-  }
-  const t0 = tsArr[lo], t1 = tsArr[lo + 1];
-  if (t1 === undefined || t1 === t0) return ch[lo];
-  const alpha = (ms - t0) / (t1 - t0);
-  return ch[lo] + alpha * (ch[lo + 1] - ch[lo]);
+  if (!ch||!ch.length||!tsArr||!tsArr.length) return null;
+  if (ms <= tsArr[0]) return ch[0];
+  if (ms >= tsArr[tsArr.length-1]) return ch[ch.length-1];
+  let lo=0, hi=tsArr.length-1;
+  while (lo<hi) { const m=(lo+hi+1)>>1; tsArr[m]<=ms?lo=m:hi=m-1; }
+  const t0=tsArr[lo], t1=tsArr[lo+1];
+  if (t1===undefined||t1===t0) return ch[lo];
+  return ch[lo]+(ms-t0)/(t1-t0)*(ch[lo+1]-ch[lo]);
 }
 
-// ── Format a value for display: sign + 3 decimals ─────────────────────────
+function interpolateGpsSpeed(ms) {
+  if (!gpsData.length) return null;
+  if (ms <= gpsData[0].timestamp_ms) return gpsData[0].speed_mps;
+  if (ms >= gpsData[gpsData.length-1].timestamp_ms) return gpsData[gpsData.length-1].speed_mps;
+  let lo=0, hi=gpsData.length-1;
+  while (lo<hi) { const m=(lo+hi+1)>>1; gpsData[m].timestamp_ms<=ms?lo=m:hi=m-1; }
+  const p0=gpsData[lo], p1=gpsData[lo+1];
+  if (!p1||p1.timestamp_ms===p0.timestamp_ms) return p0.speed_mps;
+  return p0.speed_mps+(ms-p0.timestamp_ms)/(p1.timestamp_ms-p0.timestamp_ms)*(p1.speed_mps-p0.speed_mps);
+}
+
 function fmtVal(v) {
-  if (v === null || v === undefined || !isFinite(v)) return ' —';
-  const abs = Math.abs(v);
-  // choose decimal places based on magnitude
-  const dec = abs < 0.01 ? 4 : abs < 10 ? 3 : abs < 100 ? 2 : 1;
-  const sign = v >= 0 ? '+' : '';
-  return ` ${sign}${v.toFixed(dec)}`;
+  if (v===null||v===undefined||!isFinite(v)) return ' —';
+  const abs=Math.abs(v), dec=abs<0.01?4:abs<10?3:abs<100?2:1;
+  return ` ${v>=0?'+':''}${v.toFixed(dec)}`;
 }
 
-// ── Update all legend value spans ─────────────────────────────────────────
 function updateAllChannelValues() {
-  const ts = imuSource === 'raw' ? timestamps : filtTimestamps;
+  const ts = imuSource==='raw' ? timestamps : filtTimestamps;
+  const accelChs = imuSource==='raw' ? accelChans
+    : (accelMode==='linear' ? filtLinAccChans : filtAccelChans);
 
-  const charts = imuSource === 'raw'
-    ? { accel: accelChans, gyro: gyroChans }
-    : { accel: filtAccelChans, gyro: filtGyroChans, linacc: filtLinAccChans, orient: filtOrientChans };
-
-  Object.entries(charts).forEach(([name, channels]) => {
-    channels.forEach((ch, i) => {
-      const el = document.getElementById(`val-${name}-${i}`);
-      if (!el) return;
-      if (!channelVisible[name][i]) {
-        el.textContent = '';
-        return;
-      }
-      const v = interpolateAtMs(ch, ts, currentMs);
-      el.textContent = fmtVal(v);
-    });
+  accelChs.forEach((ch,i) => {
+    const el=document.getElementById(`val-accel-${i}`);
+    if (el) el.textContent = channelVisible.accel[i] ? fmtVal(interpolateAtMs(ch,ts,currentMs)) : '';
   });
+
+  const gyroChs = imuSource==='raw' ? gyroChans : filtGyroChans;
+  gyroChs.forEach((ch,i) => {
+    const el=document.getElementById(`val-gyro-${i}`);
+    if (el) el.textContent = channelVisible.gyro[i] ? fmtVal(interpolateAtMs(ch,ts,currentMs)) : '';
+  });
+
+  if (imuSource==='filtered') {
+    filtOrientChans.forEach((ch,i) => {
+      const el=document.getElementById(`val-orient-${i}`);
+      if (el) el.textContent = channelVisible.orient[i] ? fmtVal(interpolateAtMs(ch,filtTimestamps,currentMs)) : '';
+    });
+  }
+
+  if (gpsData.length) {
+    const el=document.getElementById('val-gpsspeed');
+    // if (el) { const v=interpolateGpsSpeed(currentMs); el.textContent=v!==null?` ${v.toFixed(2)} m/s`:' —'; }
+    if (el) {
+    const v = interpolateGpsSpeed(currentMs);
+
+    if (v !== null) {
+        const kmh = v * 3.6;
+        el.textContent = ` ${v.toFixed(2)} m/s (${kmh.toFixed(2)} km/h)`;
+    } else {
+        el.textContent = ' —';
+    }
+}
+  }
 }
 
-const colorMap = {};
-let colorIdx = 0;
+const colorMap={}; let colorIdx=0;
 function labelColor(name) {
-  if (!colorMap[name]) colorMap[name] = PALETTE[colorIdx++ % PALETTE.length];
+  if (!colorMap[name]) colorMap[name]=PALETTE[colorIdx++%PALETTE.length];
   return colorMap[name];
 }
 
-// ── Data ───────────────────────────────────────────────────────────────────
-let imuData  = [], gpsData = [], labels = [];
-let session  = null, dirty = false, labelId = 0;
+// ── State ──────────────────────────────────────────────────────────────────
+let imuData=[], gpsData=[], labels=[];
+let session=null, dirty=false, labelId=0;
+let frameTs=[], framesDir=null, lastShownFrame=-1;
 
-// ── Frame player ───────────────────────────────────────────────────────────
-let frameTs = [], framesDir = null, lastShownFrame = -1;
+let accelChans=[[],[],[]], gyroChans=[[],[],[]];
+let timestamps=[], accelScale=null, gyroScale=null;
 
-// Raw IMU
-let accelChans = [[],[],[]], gyroChans = [[],[],[]];
-let timestamps = [], accelScale = null, gyroScale = null;
+let filtAccelChans=[[],[],[]], filtGyroChans=[[],[],[]];
+let filtLinAccChans=[[],[],[]], filtOrientChans=[[],[],[]];
+let filtTimestamps=[];
+let filtAccelScale=null, filtGyroScale=null, filtLinAccScale=null, filtOrientScale=null;
+let hasFiltered=false;
 
-// Filtered IMU
-let filtAccelChans  = [[],[],[]], filtGyroChans   = [[],[],[]];
-let filtLinAccChans = [[],[],[]], filtOrientChans = [[],[],[]];
-let filtTimestamps  = [];
-let filtAccelScale  = null, filtGyroScale   = null;
-let filtLinAccScale = null, filtOrientScale = null;
-let hasFiltered = false;
+let gpsSpeedScale=null;
 
-// ── Autoscaling ────────────────────────────────────────────────────────────
-let autoScaleChart = { accel: false, gyro: false, linacc: false, orient: false };
-let currentViewScale = { accel: null, gyro: null, linacc: null, orient: null };
-let visibleRange = { start: 0, end: 0 };
+let autoScaleChart={accel:false,gyro:false,linacc:false,orient:false,gpsspeed:false};
+let visibleRange={start:0,end:0};
+let imuSource='raw';
+let minTs=0, maxTs=1;
+let currentMs=0, playing=false, speed=1.0;
+let windowMs=10000, viewOffsetMs=0, autoFollow=true;
+const CURSOR_POS=0.25;
 
-let imuSource = 'raw';
-let minTs = 0, maxTs = 1;
+let isPanning=false, panStartX=0, panStartOff=0;
+let drawMode=false, isDragging=false, dragStart=null, dragEnd=null, pendingSel=null;
 
-// ── Playback ───────────────────────────────────────────────────────────────
-let currentMs = 0, playing = false, speed = 1.0;
+// ── Canvas ─────────────────────────────────────────────────────────────────
+const cvAccel    = document.getElementById('cv-accel');
+const cvGyro     = document.getElementById('cv-gyro');
+const cvOrient   = document.getElementById('cv-orient');
+const cvGpsSpeed = document.getElementById('cv-gpsspeed');
+const cvTrack    = document.getElementById('cv-track');
+const cvGps      = document.getElementById('cv-gps');
+const cvMinimap  = document.getElementById('cv-minimap');
+const ctxA=cvAccel.getContext('2d'), ctxG=cvGyro.getContext('2d');
+const ctxO=cvOrient.getContext('2d'), ctxSp=cvGpsSpeed.getContext('2d');
+const ctxT=cvTrack.getContext('2d'), ctxGps=cvGps.getContext('2d'), ctxMM=cvMinimap.getContext('2d');
 
-// ── Viewport ───────────────────────────────────────────────────────────────
-let windowMs = 10000, viewOffsetMs = 0, autoFollow = true;
-const CURSOR_POS = 0.25;
-
-// ── Pan / Draw ─────────────────────────────────────────────────────────────
-let isPanning = false, panStartX = 0, panStartOff = 0;
-let drawMode = false, isDragging = false, dragStart = null, dragEnd = null, pendingSel = null;
-
-// ── Canvas refs ────────────────────────────────────────────────────────────
-const cvAccel   = document.getElementById('cv-accel');
-const cvGyro    = document.getElementById('cv-gyro');
-const cvLinAcc  = document.getElementById('cv-linacc');
-const cvOrient  = document.getElementById('cv-orient');
-const cvTrack   = document.getElementById('cv-track');
-const cvGps     = document.getElementById('cv-gps');
-const cvMinimap = document.getElementById('cv-minimap');
-const ctxA      = cvAccel.getContext('2d');
-const ctxG      = cvGyro.getContext('2d');
-const ctxL      = cvLinAcc.getContext('2d');
-const ctxO      = cvOrient.getContext('2d');
-const ctxT      = cvTrack.getContext('2d');
-const ctxGps    = cvGps.getContext('2d');
-const ctxMM     = cvMinimap.getContext('2d');
-
-// ── Resize ─────────────────────────────────────────────────────────────────
 function resizeCanvas(cv, rowId) {
-  const el = document.getElementById(rowId);
-  if (!el || el.style.display === 'none') return;
-  const w = el.offsetWidth  || el.parentElement?.clientWidth  || 0;
-  const h = el.offsetHeight || 120;
-  if (w > 0) cv.width  = w;
-  if (h > 0) cv.height = h;
+  const el=document.getElementById(rowId);
+  if (!el||el.style.display==='none') return;
+  const w=el.offsetWidth||el.parentElement?.clientWidth||0, h=el.offsetHeight||120;
+  if (w>0) cv.width=w; if (h>0) cv.height=h;
 }
-
 function resize() {
-  resizeCanvas(cvAccel,  'row-accel');
-  resizeCanvas(cvGyro,   'row-gyro');
-  resizeCanvas(cvLinAcc, 'row-linacc');
-  resizeCanvas(cvOrient, 'row-orient');
-
-  const tr = cvTrack.parentElement;
-  cvTrack.width  = tr.clientWidth;
-  cvTrack.height = tr.clientHeight;
-
-  const gm = document.getElementById('gps-map');
-  cvGps.width  = gm.clientWidth;
-  cvGps.height = gm.clientHeight;
-
-  const mm = document.getElementById('minimap-wrap');
-  cvMinimap.width  = mm.clientWidth;
-  cvMinimap.height = mm.clientHeight;
+  resizeCanvas(cvAccel,'row-accel'); resizeCanvas(cvGyro,'row-gyro');
+  resizeCanvas(cvOrient,'row-orient'); resizeCanvas(cvGpsSpeed,'row-gpsspeed');
+  const tr=cvTrack.parentElement; cvTrack.width=tr.clientWidth; cvTrack.height=tr.clientHeight;
+  const gm=document.getElementById('gps-map'); cvGps.width=gm.clientWidth; cvGps.height=gm.clientHeight;
+  const mm=document.getElementById('minimap-wrap'); cvMinimap.width=mm.clientWidth; cvMinimap.height=mm.clientHeight;
 }
-window.addEventListener('resize', resize);
+window.addEventListener('resize',resize);
 new ResizeObserver(resize).observe(document.querySelector('.app-body'));
 
-// ── Window helpers ─────────────────────────────────────────────────────────
-function effectiveWindow() { return windowMs > 0 ? windowMs : (maxTs - minTs) || 1; }
-function msToX(ms, W)      { return ((ms - viewOffsetMs) / effectiveWindow()) * W; }
-function xToMs(x, W)       { return viewOffsetMs + (x / W) * effectiveWindow(); }
-function msToXMM(ms, W)    { return ((ms - minTs) / Math.max(maxTs - minTs, 1)) * W; }
-function xToMsMM(x, W)     { return minTs + (x / W) * (maxTs - minTs); }
-function clamp(v, lo, hi)  { return Math.max(lo, Math.min(hi, v)); }
+function effectiveWindow() { return windowMs>0?windowMs:(maxTs-minTs)||1; }
+function msToX(ms,W)       { return ((ms-viewOffsetMs)/effectiveWindow())*W; }
+function xToMs(x,W)        { return viewOffsetMs+(x/W)*effectiveWindow(); }
+function msToXMM(ms,W)     { return ((ms-minTs)/Math.max(maxTs-minTs,1))*W; }
+function xToMsMM(x,W)      { return minTs+(x/W)*(maxTs-minTs); }
+function clamp(v,lo,hi)    { return Math.max(lo,Math.min(hi,v)); }
 
-// ── Compute scale from ALL data ────────────────────────────────────────────
 function computeScale(channels, visible) {
-  let mn = Infinity, mx = -Infinity;
-  channels.forEach((ch, ci) => {
-    if (visible && !visible[ci]) return;
-    ch.forEach(v => { if (v < mn) mn = v; if (v > mx) mx = v; });
+  let mn=Infinity, mx=-Infinity;
+  channels.forEach((ch,ci) => {
+    if (visible&&!visible[ci]) return;
+    ch.forEach(v => { if(v<mn)mn=v; if(v>mx)mx=v; });
   });
   if (!isFinite(mn)) return null;
-  const pad = (mx - mn) * 0.1 || 0.5;
-  return { mn: mn - pad, mx: mx + pad };
+  const pad=(mx-mn)*0.1||0.5;
+  return {mn:mn-pad,mx:mx+pad};
 }
 
-// ── Compute scale from VISIBLE window data ─────────────────────────────────
-function computeVisibleScale(channels, tsArr, viewStart, viewEnd, visible) {
-  if (!channels || !tsArr.length) return null;
-  let mn = Infinity, mx = -Infinity, hasData = false;
+function computeGpsSpeedScale() {
+  if (!gpsData.length) return null;
+  let mn=Infinity, mx=-Infinity;
+  gpsData.forEach(p => { if(p.speed_mps<mn)mn=p.speed_mps; if(p.speed_mps>mx)mx=p.speed_mps; });
+  if (!isFinite(mn)) return null;
+  const pad=(mx-mn)*0.1||0.5;
+  return {mn:Math.max(0,mn-pad),mx:mx+pad};
+}
 
-  let lo = 0, hi = tsArr.length - 1;
-  while (lo < hi) { const m = (lo+hi)>>1; tsArr[m] < viewStart ? lo=m+1 : hi=m; }
-  const iStart = Math.max(0, lo-1);
-
-  for (let i = iStart; i < tsArr.length; i++) {
-    if (tsArr[i] > viewEnd) break;
-    hasData = true;
-    channels.forEach((ch, ci) => {
-      if (visible && !visible[ci]) return;
-      if (i < ch.length) {
-        const v = ch[i];
-        if (v < mn) mn = v;
-        if (v > mx) mx = v;
-      }
-    });
+function computeVisibleScale(channels,tsArr,viewStart,viewEnd,visible) {
+  if (!channels||!tsArr.length) return null;
+  let mn=Infinity, mx=-Infinity, hasData=false;
+  let lo=0,hi=tsArr.length-1;
+  while(lo<hi){const m=(lo+hi)>>1;tsArr[m]<viewStart?lo=m+1:hi=m;}
+  const iStart=Math.max(0,lo-1);
+  for (let i=iStart;i<tsArr.length;i++) {
+    if (tsArr[i]>viewEnd) break; hasData=true;
+    channels.forEach((ch,ci)=>{if(visible&&!visible[ci])return;if(i<ch.length){const v=ch[i];if(v<mn)mn=v;if(v>mx)mx=v;}});
   }
-  if (!hasData || !isFinite(mn)) return null;
-  const range = mx - mn || 1;
-  const pad   = range * 0.05;
-  return { mn: mn - pad, mx: mx + pad };
+  if (!hasData||!isFinite(mn)) return null;
+  const range=mx-mn||1, pad=range*0.05;
+  return {mn:mn-pad,mx:mx+pad};
 }
 
-// ── Toggle autoscale ───────────────────────────────────────────────────────
-function toggleAutoScale(chartName) {
-  autoScaleChart[chartName] = !autoScaleChart[chartName];
-  updateAutoscaleButtons();
-  buildTicks();
+function computeVisibleGpsSpeedScale(viewStart,viewEnd) {
+  if (!gpsData.length) return null;
+  let mn=Infinity,mx=-Infinity,hasData=false;
+  for (const p of gpsData) {
+    if (p.timestamp_ms<viewStart) continue; if(p.timestamp_ms>viewEnd) break;
+    hasData=true; if(p.speed_mps<mn)mn=p.speed_mps; if(p.speed_mps>mx)mx=p.speed_mps;
+  }
+  if (!hasData||!isFinite(mn)) return gpsSpeedScale;
+  const range=mx-mn||1;
+  return {mn:Math.max(0,mn-range*0.05),mx:mx+range*0.05};
 }
 
 function updateAutoscaleButtons() {
-  ['accel', 'gyro', 'linacc', 'orient'].forEach(name => {
+  // Actualizar todos los botones normalmente
+  ['gyro', 'linacc', 'orient', 'gpsspeed'].forEach(name => {
     const btn = document.getElementById(`autoscale-${name}`);
     if (btn) {
       btn.classList.toggle('on', autoScaleChart[name]);
       btn.textContent = autoScaleChart[name] ? '⦿ Auto' : 'Auto';
     }
   });
+  
+  // Para accel, mostrar el estado según el modo actual
+  const autoBtn = document.getElementById('autoscale-accel');
+  if (autoBtn) {
+    const isAuto = imuSource === 'filtered' && accelMode === 'linear' 
+      ? autoScaleChart.linacc 
+      : autoScaleChart.accel;
+    autoBtn.classList.toggle('on', isAuto);
+    autoBtn.textContent = isAuto ? '⦿ Auto' : 'Auto';
+  }
 }
 
-// ── Auto-follow ────────────────────────────────────────────────────────────
-function updateAutoFollow() {
-  if (!autoFollow || minTs === maxTs) return;
-  const wMs = effectiveWindow();
-  viewOffsetMs = clamp(currentMs - wMs * CURSOR_POS, minTs, maxTs - wMs);
+function toggleAutoScale(chartName) {
+  if (imuSource === 'filtered' && chartName === 'accel') {
+    // Cuando estamos en filtered, el botón accel controla la escala actual (filt o lin)
+    if (accelMode === 'linear') {
+      autoScaleChart.linacc = !autoScaleChart.linacc;
+      updateAutoscaleButtonVisual('linacc', autoScaleChart.linacc);
+    } else {
+      autoScaleChart.accel = !autoScaleChart.accel;
+      updateAutoscaleButtonVisual('accel', autoScaleChart.accel);
+    }
+    // Actualizar el botón accel para que muestre el estado correcto
+    updateAutoscaleButtonVisual('accel', autoScaleChart[accelMode === 'linear' ? 'linacc' : 'accel']);
+  } else {
+    autoScaleChart[chartName] = !autoScaleChart[chartName];
+    updateAutoscaleButtonVisual(chartName, autoScaleChart[chartName]);
+  }
+  updateAutoscaleButtons();
+  buildTicks();
 }
 
-// ── Zoom ───────────────────────────────────────────────────────────────────
-function setZoomFromSelect(v) { setZoom(parseInt(v), null); }
-
-function setZoom(newWindowMs, focalMs) {
-  const wOld = effectiveWindow();
-  windowMs = newWindowMs;
-  const wNew = effectiveWindow();
-  const focal = focalMs !== null ? focalMs : currentMs;
-  const ratio = (focal - viewOffsetMs) / wOld;
-  viewOffsetMs = clamp(focal - ratio * wNew, minTs, Math.max(minTs, maxTs - wNew));
-
-  const sel = document.getElementById('zoom-sel');
-  const closest = [...sel.options].reduce((best, opt) => {
-    const ov = parseInt(opt.value);
-    if (ov === 0 && newWindowMs === 0) return opt;
-    if (newWindowMs === 0) return best;
-    return Math.abs(ov - newWindowMs) < Math.abs(parseInt(best.value) - newWindowMs) ? opt : best;
+function updateAutoscaleButtons() {
+  ['accel','gyro','linacc','orient','gpsspeed'].forEach(name => {
+    const btn=document.getElementById(`autoscale-${name}`);
+    if (btn) { btn.classList.toggle('on',autoScaleChart[name]); btn.textContent=autoScaleChart[name]?'⦿ Auto':'Auto'; }
   });
-  sel.value = closest.value;
-  updateWindowInfo();
-  updateMinimapOverlay();
 }
 
+function updateAutoFollow() {
+  if (!autoFollow||minTs===maxTs) return;
+  const wMs=effectiveWindow();
+  viewOffsetMs=clamp(currentMs-wMs*CURSOR_POS,minTs,maxTs-wMs);
+}
+
+function setZoomFromSelect(v) { setZoom(parseInt(v),null); }
+function setZoom(newWindowMs,focalMs) {
+  const wOld=effectiveWindow(); windowMs=newWindowMs; const wNew=effectiveWindow();
+  const focal=focalMs!==null?focalMs:currentMs;
+  const ratio=(focal-viewOffsetMs)/wOld;
+  viewOffsetMs=clamp(focal-ratio*wNew,minTs,Math.max(minTs,maxTs-wNew));
+  const sel=document.getElementById('zoom-sel');
+  const closest=[...sel.options].reduce((best,opt)=>{
+    const ov=parseInt(opt.value);
+    if(ov===0&&newWindowMs===0)return opt; if(newWindowMs===0)return best;
+    return Math.abs(ov-newWindowMs)<Math.abs(parseInt(best.value)-newWindowMs)?opt:best;
+  });
+  sel.value=closest.value; updateWindowInfo(); updateMinimapOverlay();
+}
 function updateWindowInfo() {
-  document.getElementById('win-info-accel').textContent = `⟷ ${(effectiveWindow()/1000).toFixed(1)}s window`;
+  document.getElementById('win-info-accel').textContent=`⟷ ${(effectiveWindow()/1000).toFixed(1)}s window`;
 }
 
-// ── Ticks ──────────────────────────────────────────────────────────────────
 function buildTicks() {
-  const row = document.getElementById('tick-row');
-  row.innerHTML = '';
-  if (maxTs <= minTs) return;
-  const wMs = effectiveWindow(), dur = wMs / 1000;
-  const n = Math.min(8, Math.max(2, Math.floor(dur / 2)));
-  for (let i = 0; i <= n; i++) {
-    const span = document.createElement('span');
-    span.textContent = ((viewOffsetMs + wMs * i / n) / 1000).toFixed(1) + 's';
+  const row=document.getElementById('tick-row'); row.innerHTML='';
+  if (maxTs<=minTs) return;
+  const wMs=effectiveWindow(),dur=wMs/1000;
+  const n=Math.min(8,Math.max(2,Math.floor(dur/2)));
+  for (let i=0;i<=n;i++) {
+    const span=document.createElement('span');
+    span.textContent=((viewOffsetMs+wMs*i/n)/1000).toFixed(1)+'s';
     row.appendChild(span);
   }
 }
 
-// ── Main RAF loop ──────────────────────────────────────────────────────────
-let _raf = null, _lastFrameT = 0, _lastVideoSync = -999, _tickThrottle = 0;
+// ── Main loop ──────────────────────────────────────────────────────────────
+let _raf=null,_lastFrameT=0,_lastVideoSync=-999,_tickThrottle=0;
 
 function mainLoop(t) {
-  if (playing && _lastFrameT > 0) {
-    const dt = (t - _lastFrameT) * speed;
-    currentMs += dt;
-    if (currentMs >= maxTs) {
-      currentMs = maxTs; playing = false;
+  if (playing&&_lastFrameT>0) {
+    const dt=(t-_lastFrameT)*speed; currentMs+=dt;
+    if (currentMs>=maxTs) {
+      currentMs=maxTs; playing=false;
       document.getElementById('btn-play').classList.remove('playing');
-      document.getElementById('btn-play').textContent = '▶';
+      document.getElementById('btn-play').textContent='▶';
     }
     if (autoFollow) updateAutoFollow();
-
-    const frac = (currentMs - minTs) / (maxTs - minTs);
-    document.getElementById('scrubber').value = Math.round(frac * 10000);
+    const frac=(currentMs-minTs)/(maxTs-minTs);
+    document.getElementById('scrubber').value=Math.round(frac*10000);
     updateTimeDisplay();
-
-    if (Math.abs(currentMs - _lastVideoSync) > 80) {
-      syncGPSDisplay(); syncFrame(); _lastVideoSync = currentMs;
-    }
-    _tickThrottle += dt;
-    if (_tickThrottle > 500) { buildTicks(); _tickThrottle = 0; }
+    if (Math.abs(currentMs-_lastVideoSync)>80) { syncGPSDisplay();syncFrame();_lastVideoSync=currentMs; }
+    _tickThrottle+=dt; if (_tickThrottle>500) { buildTicks();_tickThrottle=0; }
   }
-  _lastFrameT = t;
+  _lastFrameT=t;
+  visibleRange.start=viewOffsetMs; visibleRange.end=viewOffsetMs+effectiveWindow();
+  const scales=getScales();
 
-  visibleRange.start = viewOffsetMs;
-  visibleRange.end   = viewOffsetMs + effectiveWindow();
-
-  const scales = getScales();
-
-  if (imuSource === 'raw') {
-    drawIMUChart(cvAccel, ctxA, accelChans, scales.accel, ACCEL_COLORS, timestamps, channelVisible.accel);
-    drawIMUChart(cvGyro,  ctxG, gyroChans,  scales.gyro,  GYRO_COLORS,  timestamps, channelVisible.gyro);
+  if (imuSource==='raw') {
+    drawIMUChart(cvAccel,ctxA,accelChans,scales.accel,ACCEL_COLORS,timestamps,channelVisible.accel);
+    drawIMUChart(cvGyro, ctxG,gyroChans, scales.gyro, GYRO_COLORS, timestamps,channelVisible.gyro);
   } else {
-    drawIMUChart(cvAccel,  ctxA, filtAccelChans,  scales.accel,  ACCEL_COLORS,   filtTimestamps, channelVisible.accel);
-    drawIMUChart(cvGyro,   ctxG, filtGyroChans,   scales.gyro,   GYRO_COLORS,    filtTimestamps, channelVisible.gyro);
-    drawIMUChart(cvLinAcc, ctxL, filtLinAccChans, scales.linacc, LINACC_COLORS,  filtTimestamps, channelVisible.linacc);
-    drawIMUChart(cvOrient, ctxO, filtOrientChans, scales.orient, ORIENT_COLORS,  filtTimestamps, channelVisible.orient);
+    const accelChs   = accelMode==='linear' ? filtLinAccChans : filtAccelChans;
+    const accelScale = accelMode==='linear' ? scales.linacc   : scales.accel;
+    drawIMUChart(cvAccel,  ctxA, accelChs,      accelScale,   ACCEL_COLORS,  filtTimestamps,channelVisible.accel);
+    drawIMUChart(cvGyro,   ctxG, filtGyroChans, scales.gyro,  GYRO_COLORS,   filtTimestamps,channelVisible.gyro);
+    drawIMUChart(cvOrient, ctxO, filtOrientChans,scales.orient,ORIENT_COLORS,filtTimestamps,channelVisible.orient);
   }
 
-  // ── Update live value readouts in legend ─────────────────────────────────
+  drawGpsSpeedChart(scales.gpsspeed);
   updateAllChannelValues();
-
-  drawTrack();
-  drawGPS();
-  updateMinimapOverlay();
-  _raf = requestAnimationFrame(mainLoop);
+  drawTrack(); drawGPS(); updateMinimapOverlay();
+  _raf=requestAnimationFrame(mainLoop);
 }
 
-// ── Get scales ─────────────────────────────────────────────────────────────
 function getScales() {
+  const vs = visibleRange.start, ve = visibleRange.end;
+  const gpsScl = autoScaleChart.gpsspeed ? (computeVisibleGpsSpeedScale(vs, ve) || gpsSpeedScale) : gpsSpeedScale;
+  
   if (imuSource === 'raw') {
     return {
-      accel: autoScaleChart.accel
-        ? computeVisibleScale(accelChans, timestamps, visibleRange.start, visibleRange.end, channelVisible.accel) || accelScale
-        : accelScale,
-      gyro: autoScaleChart.gyro
-        ? computeVisibleScale(gyroChans,  timestamps, visibleRange.start, visibleRange.end, channelVisible.gyro)  || gyroScale
-        : gyroScale,
+      accel: autoScaleChart.accel ? computeVisibleScale(accelChans, timestamps, vs, ve, channelVisible.accel) || accelScale : accelScale,
+      gyro:  autoScaleChart.gyro ? computeVisibleScale(gyroChans, timestamps, vs, ve, channelVisible.gyro) || gyroScale : gyroScale,
+      gpsspeed: gpsScl,
     };
+  }
+  
+  // For filtered mode - handle accel mode correctly
+  let accelScaleData, accelAutoKey;
+  if (accelMode === 'linear') {
+    accelScaleData = filtLinAccChans;
+    accelAutoKey = 'linacc';  // Use linacc's autoscale setting
   } else {
-    return {
-      accel:  autoScaleChart.accel
-        ? computeVisibleScale(filtAccelChans,  filtTimestamps, visibleRange.start, visibleRange.end, channelVisible.accel)  || filtAccelScale
-        : filtAccelScale,
-      gyro:   autoScaleChart.gyro
-        ? computeVisibleScale(filtGyroChans,   filtTimestamps, visibleRange.start, visibleRange.end, channelVisible.gyro)   || filtGyroScale
-        : filtGyroScale,
-      linacc: autoScaleChart.linacc
-        ? computeVisibleScale(filtLinAccChans, filtTimestamps, visibleRange.start, visibleRange.end, channelVisible.linacc) || filtLinAccScale
-        : filtLinAccScale,
-      orient: autoScaleChart.orient
-        ? computeVisibleScale(filtOrientChans, filtTimestamps, visibleRange.start, visibleRange.end, channelVisible.orient) || filtOrientScale
-        : filtOrientScale,
-    };
+    accelScaleData = filtAccelChans;
+    accelAutoKey = 'accel';
   }
+  
+  const accelAuto = autoScaleChart[accelAutoKey];
+  const accelComputed = accelAuto ? computeVisibleScale(accelScaleData, filtTimestamps, vs, ve, channelVisible.accel) || 
+                        (accelMode === 'linear' ? filtLinAccScale : filtAccelScale) 
+                        : (accelMode === 'linear' ? filtLinAccScale : filtAccelScale);
+  
+  return {
+    accel:  accelComputed,
+    gyro:   autoScaleChart.gyro ? computeVisibleScale(filtGyroChans, filtTimestamps, vs, ve, channelVisible.gyro) || filtGyroScale : filtGyroScale,
+    linacc: autoScaleChart.linacc ? computeVisibleScale(filtLinAccChans, filtTimestamps, vs, ve, channelVisible.linacc) || filtLinAccScale : filtLinAccScale,
+    orient: autoScaleChart.orient ? computeVisibleScale(filtOrientChans, filtTimestamps, vs, ve, channelVisible.orient) || filtOrientScale : filtOrientScale,
+    gpsspeed: gpsScl,
+  };
 }
 
-// ── Draw Y-axis range labels ───────────────────────────────────────────────
-// Draws tick labels on the left edge for the given scale.
-// 5 ticks: max, 75%, mid, 25%, min. Skips if too close to edges.
-function drawYAxis(ctx, W, PH, scale) {
+// ── Drawing helpers ────────────────────────────────────────────────────────
+function drawYAxis(ctx,W,PH,scale) {
   if (!scale) return;
-  const { mn, mx } = scale;
-  const rng = mx - mn || 1;
-  const sY  = PH / rng;
-
-  ctx.font = "8px 'Azeret Mono'";
-  ctx.textBaseline = 'middle';
-
-  // pick nice tick values spanning the range
-  const tickCount = 5;
-  for (let i = 0; i <= tickCount; i++) {
-    const v  = mn + rng * i / tickCount;
-    const y  = PH - (v - mn) * sY;
-    if (y < 6 || y > PH - 6) continue;  // skip if too close to border
-
-    const label = Math.abs(v) < 0.001 ? '0'
-                : Math.abs(v) < 10    ? v.toFixed(2)
-                : Math.abs(v) < 100   ? v.toFixed(1)
-                : v.toFixed(0);
-    const tw = ctx.measureText(label).width;
-
-    // pill background
-    ctx.fillStyle = 'rgba(6,8,16,0.82)';
-    ctx.fillRect(3, y - 6, tw + 6, 12);
-
-    // tick mark
-    ctx.strokeStyle = '#1d2a3d';
-    ctx.lineWidth   = 1;
-    ctx.beginPath();
-    ctx.moveTo(0,  y);
-    ctx.lineTo(tw + 12, y);
-    ctx.stroke();
-
-    // label text
-    ctx.fillStyle = '#4a607e';
-    ctx.fillText(label, 5, y);
+  const {mn,mx}=scale, rng=mx-mn||1, sY=PH/rng;
+  ctx.font="8px 'Azeret Mono'"; ctx.textBaseline='middle';
+  for (let i=0;i<=5;i++) {
+    const v=mn+rng*i/5, y=PH-(v-mn)*sY;
+    if (y<6||y>PH-6) continue;
+    const label=Math.abs(v)<0.001?'0':Math.abs(v)<10?v.toFixed(2):Math.abs(v)<100?v.toFixed(1):v.toFixed(0);
+    const tw=ctx.measureText(label).width;
+    ctx.fillStyle='rgba(6,8,16,0.82)'; ctx.fillRect(3,y-6,tw+6,12);
+    ctx.strokeStyle='#1d2a3d'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(tw+12,y); ctx.stroke();
+    ctx.fillStyle='#4a607e'; ctx.fillText(label,5,y);
   }
-
-  // Also draw min/max range badge at bottom-left corner
-  const rangeLabel = `[${mn.toFixed(1)}, ${mx.toFixed(1)}]`;
-  const rw = ctx.measureText(rangeLabel).width;
-  ctx.fillStyle = 'rgba(6,8,16,0.72)';
-  ctx.fillRect(2, PH - 20, rw + 8, 13);
-  ctx.fillStyle = '#2d3f58';
-  ctx.fillText(rangeLabel, 5, PH - 14);
-
-  ctx.textBaseline = 'alphabetic'; // reset
+  const rl=`[${mn.toFixed(1)}, ${mx.toFixed(1)}]`, rw=ctx.measureText(rl).width;
+  ctx.fillStyle='rgba(6,8,16,0.72)'; ctx.fillRect(2,PH-20,rw+8,13);
+  ctx.fillStyle='#2d3f58'; ctx.fillText(rl,5,PH-14);
+  ctx.textBaseline='alphabetic';
 }
 
-// ── Draw IMU chart ─────────────────────────────────────────────────────────
-function drawIMUChart(cv, ctx, channels, scale, colors, tsArr, visible) {
-  const W = cv.width, H = cv.height;
-  if (!W || !H) return;
-  const PAD = 16, PH = H - PAD;
-
-  ctx.fillStyle = '#060810';
-  ctx.fillRect(0, 0, W, H);
-
-  if (!tsArr || !tsArr.length) return;
-
-  const wMs = effectiveWindow(), viewEnd = viewOffsetMs + wMs;
-
-  // Horizontal grid
-  ctx.strokeStyle = '#0d1420'; ctx.lineWidth = 1;
-  ctx.beginPath();
-  for (let i = 1; i < 4; i++) { ctx.moveTo(0, PH*i/4); ctx.lineTo(W, PH*i/4); }
+function drawGridAndAxis(ctx,W,H,PAD,PH) {
+  const wMs=effectiveWindow(), viewEnd=viewOffsetMs+wMs;
+  ctx.strokeStyle='#0d1420'; ctx.lineWidth=1; ctx.beginPath();
+  for(let i=1;i<4;i++){ctx.moveTo(0,PH*i/4);ctx.lineTo(W,PH*i/4);}
   ctx.stroke();
-
-  // Vertical time grid
-  const gridIntervalMs = niceInterval(wMs, 6);
-  const gridStart = Math.ceil(viewOffsetMs / gridIntervalMs) * gridIntervalMs;
-  ctx.strokeStyle = '#111d2e'; ctx.lineWidth = 1;
-  ctx.beginPath();
-  for (let t = gridStart; t <= viewEnd; t += gridIntervalMs) {
-    const x = msToX(t, W); ctx.moveTo(x, 0); ctx.lineTo(x, PH);
-  }
+  const gi=niceInterval(wMs,6), gs=Math.ceil(viewOffsetMs/gi)*gi;
+  ctx.strokeStyle='#111d2e'; ctx.lineWidth=1; ctx.beginPath();
+  for(let t=gs;t<=viewEnd;t+=gi){const x=msToX(t,W);ctx.moveTo(x,0);ctx.lineTo(x,PH);}
   ctx.stroke();
+  ctx.fillStyle='#060810'; ctx.fillRect(0,PH,W,PAD);
+  ctx.strokeStyle='#1d2a3d'; ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(0,PH);ctx.lineTo(W,PH);ctx.stroke();
+  ctx.fillStyle='#3a4e6a'; ctx.font="8px 'Azeret Mono'";
+  for(let t=gs;t<=viewEnd;t+=gi) ctx.fillText((t/1000).toFixed(gi<1000?2:1)+'s',msToX(t,W)+2,H-3);
+  return {gi,gs,viewEnd};
+}
 
-  // Time axis
-  ctx.fillStyle = '#060810'; ctx.fillRect(0, PH, W, PAD);
-  ctx.strokeStyle = '#1d2a3d'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, PH); ctx.lineTo(W, PH); ctx.stroke();
-  ctx.fillStyle = '#3a4e6a'; ctx.font = "8px 'Azeret Mono'";
-  for (let t = gridStart; t <= viewEnd; t += gridIntervalMs) {
-    ctx.fillText((t/1000).toFixed(gridIntervalMs < 1000 ? 2 : 1)+'s', msToX(t,W)+2, H-3);
-  }
-
-  // Label bands
-  labels.forEach(lbl => {
-    const x1 = msToX(lbl.start_ms, W), x2 = msToX(lbl.end_ms, W);
-    if (x2 < 0 || x1 > W) return;
-    const col = labelColor(lbl.label);
-    const cx1 = Math.max(0,x1), cx2 = Math.min(W,x2);
-    ctx.fillStyle = col+'22'; ctx.fillRect(cx1, 0, cx2-cx1, PH);
-    ctx.strokeStyle = col+'88'; ctx.lineWidth = 1;
-    ctx.beginPath();
-    if (x1 >= 0) { ctx.moveTo(x1,0); ctx.lineTo(x1,PH); }
-    if (x2 <= W) { ctx.moveTo(x2,0); ctx.lineTo(x2,PH); }
+function drawLabelBands(ctx,W,PH) {
+  labels.forEach(lbl=>{
+    const x1=msToX(lbl.start_ms,W), x2=msToX(lbl.end_ms,W);
+    if(x2<0||x1>W) return;
+    const col=labelColor(lbl.label), cx1=Math.max(0,x1), cx2=Math.min(W,x2);
+    ctx.fillStyle=col+'22'; ctx.fillRect(cx1,0,cx2-cx1,PH);
+    ctx.strokeStyle=col+'88'; ctx.lineWidth=1; ctx.beginPath();
+    if(x1>=0){ctx.moveTo(x1,0);ctx.lineTo(x1,PH);}
+    if(x2<=W){ctx.moveTo(x2,0);ctx.lineTo(x2,PH);}
     ctx.stroke();
-    if (cx2-cx1 > 16) {
-      ctx.font = "bold 8px 'Azeret Mono'"; ctx.fillStyle = col+'cc';
-      ctx.fillText(lbl.label, cx1+3, 18);
-    }
+    if(cx2-cx1>16){ctx.font="bold 8px 'Azeret Mono'";ctx.fillStyle=col+'cc';ctx.fillText(lbl.label,cx1+3,18);}
   });
+}
 
-  // Drag selection
-  if (isDragging && dragStart !== null && dragEnd !== null) {
-    const lo = Math.min(dragStart,dragEnd), hi = Math.max(dragStart,dragEnd);
-    const sx1 = msToX(lo,W), sx2 = msToX(hi,W);
-    ctx.fillStyle = '#f59e0b18'; ctx.fillRect(sx1, 0, sx2-sx1, PH);
-    ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 1.5; ctx.setLineDash([5,4]);
-    ctx.beginPath(); ctx.moveTo(sx1,0); ctx.lineTo(sx1,PH); ctx.moveTo(sx2,0); ctx.lineTo(sx2,PH);
-    ctx.stroke(); ctx.setLineDash([]);
-  }
+function drawDragSel(ctx,W,PH) {
+  if (!isDragging||dragStart===null||dragEnd===null) return;
+  const lo=Math.min(dragStart,dragEnd), hi=Math.max(dragStart,dragEnd);
+  const sx1=msToX(lo,W), sx2=msToX(hi,W);
+  ctx.fillStyle='#f59e0b18'; ctx.fillRect(sx1,0,sx2-sx1,PH);
+  ctx.strokeStyle='#f59e0b'; ctx.lineWidth=1.5; ctx.setLineDash([5,4]);
+  ctx.beginPath(); ctx.moveTo(sx1,0); ctx.lineTo(sx1,PH); ctx.moveTo(sx2,0); ctx.lineTo(sx2,PH);
+  ctx.stroke(); ctx.setLineDash([]);
+}
 
-  // Signal lines
-  if (scale && tsArr.length >= 2) {
-    const { mn, mx } = scale;
-    const rng = mx - mn || 1, sY = PH / rng;
-    const marginMs = wMs * 0.05;
-    const vStart = viewOffsetMs - marginMs, vEnd_m = viewEnd + marginMs;
+function drawCursorLine(ctx,W,PH) {
+  const cx=msToX(currentMs,W); if(cx<0||cx>W) return;
+  const grad=ctx.createLinearGradient(cx-8,0,cx+8,0);
+  grad.addColorStop(0,'transparent'); grad.addColorStop(0.5,'rgba(255,255,255,0.07)'); grad.addColorStop(1,'transparent');
+  ctx.fillStyle=grad; ctx.fillRect(cx-8,0,16,PH);
+  ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=1.5; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,PH); ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,.9)';
+  ctx.beginPath(); ctx.moveTo(cx-5,0); ctx.lineTo(cx+5,0); ctx.lineTo(cx,7); ctx.fill();
+}
 
-    let lo = 0, hi = tsArr.length - 1;
-    while (lo < hi) { const m = (lo+hi)>>1; tsArr[m] < vStart ? lo=m+1 : hi=m; }
-    const iStart = Math.max(0, lo-1);
+function drawIMUChart(cv,ctx,channels,scale,colors,tsArr,visible) {
+  const W=cv.width, H=cv.height; if(!W||!H) return;
+  const PAD=16, PH=H-PAD;
+  ctx.fillStyle='#060810'; ctx.fillRect(0,0,W,H);
+  if (!tsArr||!tsArr.length) return;
+  const {viewEnd}=drawGridAndAxis(ctx,W,H,PAD,PH);
+  drawLabelBands(ctx,W,PH);
+  drawDragSel(ctx,W,PH);
 
-    channels.forEach((data, ci) => {
-      if (visible && !visible[ci]) return;
-      if (!data.length) return;
+  if (scale&&tsArr.length>=2) {
+    const {mn,mx}=scale, rng=mx-mn||1, sY=PH/rng;
+    const wMs=effectiveWindow(), marginMs=wMs*0.05;
+    const vStart=viewOffsetMs-marginMs, vEnd_m=viewEnd+marginMs;
+    let lo=0,hi=tsArr.length-1;
+    while(lo<hi){const m=(lo+hi)>>1;tsArr[m]<vStart?lo=m+1:hi=m;}
+    const iStart=Math.max(0,lo-1);
 
-      ctx.strokeStyle = colors[ci]; ctx.lineWidth = 1.4; ctx.setLineDash([]);
-      ctx.beginPath();
-      let moved = false;
-      for (let i = iStart; i < data.length; i++) {
-        if (tsArr[i] > vEnd_m) break;
-        const x = msToX(tsArr[i], W);
-        const y = PH - (data[i] - mn) * sY;
-        if (!moved) { ctx.moveTo(x,y); moved=true; } else ctx.lineTo(x,y);
+    channels.forEach((data,ci) => {
+      if (visible&&!visible[ci]||!data.length) return;
+      ctx.strokeStyle=colors[ci]; ctx.lineWidth=1.4; ctx.setLineDash([]);
+      ctx.beginPath(); let moved=false;
+      for(let i=iStart;i<data.length;i++){
+        if(tsArr[i]>vEnd_m) break;
+        const x=msToX(tsArr[i],W), y=PH-(data[i]-mn)*sY;
+        if(!moved){ctx.moveTo(x,y);moved=true;}else ctx.lineTo(x,y);
       }
       ctx.stroke();
     });
 
-    // ── Draw cursor dot per visible channel ───────────────────────────────
-    const cx = msToX(currentMs, W);
-    if (cx >= 0 && cx <= W) {
-      channels.forEach((data, ci) => {
-        if (visible && !visible[ci]) return;
-        if (!data.length) return;
-        const v = interpolateAtMs(data, tsArr, currentMs);
-        if (v === null) return;
-        const cy = PH - (v - mn) * sY;
-        ctx.beginPath();
-        ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
-        ctx.fillStyle   = colors[ci];
-        ctx.strokeStyle = 'rgba(6,8,16,0.8)';
-        ctx.lineWidth   = 1.5;
-        ctx.fill();
-        ctx.stroke();
+    // Cursor dots
+    const cx=msToX(currentMs,W);
+    if (cx>=0&&cx<=W) {
+      channels.forEach((data,ci) => {
+        if (visible&&!visible[ci]||!data.length) return;
+        const v=interpolateAtMs(data,tsArr,currentMs); if(v===null) return;
+        const cy=PH-(v-mn)*sY;
+        ctx.beginPath(); ctx.arc(cx,cy,3.5,0,Math.PI*2);
+        ctx.fillStyle=colors[ci]; ctx.strokeStyle='rgba(6,8,16,0.8)'; ctx.lineWidth=1.5;
+        ctx.fill(); ctx.stroke();
       });
     }
-  }
 
-  // Zero line
-  if (scale) {
-    const { mn, mx } = scale;
-    const rng = mx - mn || 1, sY = PH / rng;
-    const zy = PH - (0 - mn) * sY;
-    if (zy > 0 && zy < PH) {
-      ctx.strokeStyle = '#ffffff18'; ctx.lineWidth = 1; ctx.setLineDash([4,6]);
-      ctx.beginPath(); ctx.moveTo(0, zy); ctx.lineTo(W, zy); ctx.stroke(); ctx.setLineDash([]);
+    // Zero line
+    const zy=PH-(0-mn)*sY;
+    if (zy>0&&zy<PH) {
+      ctx.strokeStyle='#ffffff18'; ctx.lineWidth=1; ctx.setLineDash([4,6]);
+      ctx.beginPath(); ctx.moveTo(0,zy); ctx.lineTo(W,zy); ctx.stroke(); ctx.setLineDash([]);
     }
   }
 
-  // ── Y-axis range labels ────────────────────────────────────────────────
-  drawYAxis(ctx, W, PH, scale);
-
-  // Cursor line + triangle
-  const cx = msToX(currentMs, W);
-  if (cx >= 0 && cx <= W) {
-    const grad = ctx.createLinearGradient(cx-8,0,cx+8,0);
-    grad.addColorStop(0,'transparent');
-    grad.addColorStop(0.5,'rgba(255,255,255,0.07)');
-    grad.addColorStop(1,'transparent');
-    ctx.fillStyle = grad; ctx.fillRect(cx-8,0,16,PH);
-    ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1.5; ctx.setLineDash([]);
-    ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,PH); ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,.9)';
-    ctx.beginPath(); ctx.moveTo(cx-5,0); ctx.lineTo(cx+5,0); ctx.lineTo(cx,7); ctx.fill();
-  }
+  drawYAxis(ctx,W,PH,scale);
+  drawCursorLine(ctx,W,PH);
 }
 
-// ── IMU source switching ───────────────────────────────────────────────────
+function drawGpsSpeedChart(scale) {
+  const cv=cvGpsSpeed, ctx=ctxSp;
+  const W=cv.width, H=cv.height; if(!W||!H) return;
+  const PAD=16, PH=H-PAD;
+  ctx.fillStyle='#060810'; ctx.fillRect(0,0,W,H);
+  if (!gpsData.length||!scale) return;
+
+  const {viewEnd}=drawGridAndAxis(ctx,W,H,PAD,PH);
+  drawLabelBands(ctx,W,PH);
+  drawDragSel(ctx,W,PH);
+
+  const {mn,mx}=scale, rng=mx-mn||1, sY=PH/rng;
+  const wMs=effectiveWindow(), marginMs=wMs*0.05;
+  const vStart=viewOffsetMs-marginMs, vEnd_m=viewEnd+marginMs;
+
+  let iStart=0;
+  for(let i=0;i<gpsData.length;i++){if(gpsData[i].timestamp_ms>=vStart){iStart=Math.max(0,i-1);break;}}
+
+  // Filled area
+  ctx.beginPath();
+  let first=true, lastX=0;
+  for(let i=iStart;i<gpsData.length;i++){
+    const p=gpsData[i]; if(p.timestamp_ms>vEnd_m) break;
+    const x=msToX(p.timestamp_ms,W), y=PH-(p.speed_mps-mn)*sY;
+    if(first){ctx.moveTo(x,PH);ctx.lineTo(x,y);first=false;}else ctx.lineTo(x,y);
+    lastX=x;
+  }
+  if (!first) {
+    ctx.lineTo(lastX,PH); ctx.closePath();
+    const grad=ctx.createLinearGradient(0,0,0,PH);
+    grad.addColorStop(0,'#4ade8033'); grad.addColorStop(1,'#4ade8005');
+    ctx.fillStyle=grad; ctx.fill();
+  }
+
+  // Speed line
+  ctx.beginPath(); first=true;
+  for(let i=iStart;i<gpsData.length;i++){
+    const p=gpsData[i]; if(p.timestamp_ms>vEnd_m) break;
+    const x=msToX(p.timestamp_ms,W), y=PH-(p.speed_mps-mn)*sY;
+    if(first){ctx.moveTo(x,y);first=false;}else ctx.lineTo(x,y);
+  }
+  ctx.strokeStyle=GPS_SPD_COLOR; ctx.lineWidth=1.6; ctx.setLineDash([]); ctx.stroke();
+
+  // Cursor dot
+  const cxPos=msToX(currentMs,W);
+  if (cxPos>=0&&cxPos<=W) {
+    const sv=interpolateGpsSpeed(currentMs);
+    if (sv!==null) {
+      const cy=PH-(sv-mn)*sY;
+      ctx.beginPath(); ctx.arc(cxPos,cy,3.5,0,Math.PI*2);
+      ctx.fillStyle=GPS_SPD_COLOR; ctx.strokeStyle='rgba(6,8,16,0.8)'; ctx.lineWidth=1.5;
+      ctx.fill(); ctx.stroke();
+    }
+  }
+
+  // Zero line (only if mn > 0 baseline not at 0)
+  const zy=PH-(0-mn)*sY;
+  if (zy>0&&zy<PH) {
+    ctx.strokeStyle='#ffffff18'; ctx.lineWidth=1; ctx.setLineDash([4,6]);
+    ctx.beginPath(); ctx.moveTo(0,zy); ctx.lineTo(W,zy); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  drawYAxis(ctx,W,PH,scale);
+  drawCursorLine(ctx,W,PH);
+}
+
+// ── IMU source ─────────────────────────────────────────────────────────────
 function setImuSource(src) {
-  imuSource = src;
-  ['raw','filtered'].forEach(s =>
-    document.getElementById(`src-${s}`).classList.toggle('active', s === src));
+  imuSource=src;
+  ['raw','filtered'].forEach(s=>document.getElementById(`src-${s}`).classList.toggle('active',s===src));
+  const isFilt=src==='filtered';
+  document.getElementById('row-orient').style.display=isFilt?'':'none';
+  const mg=document.getElementById('accel-mode-group');
+  if (mg) mg.style.display=isFilt?'flex':'none';
+  const sep=mg?mg.nextElementSibling:null;
+  if (sep&&sep.classList.contains('accel-mode-sep')) sep.style.display=isFilt?'block':'none';
 
-  const isFilt = src === 'filtered';
-  document.getElementById('row-linacc').style.display = isFilt ? '' : 'none';
-  document.getElementById('row-orient').style.display = isFilt ? '' : 'none';
-
-  document.getElementById('lbl-accel').textContent = isFilt ? 'Accel (filtered) · m/s²' : 'Accelerometer · m/s²';
-  document.getElementById('lbl-gyro').textContent  = isFilt ? 'Angular Velocity · rad/s' : 'Gyroscope · rad/s';
-
-  requestAnimationFrame(() => resize());
+  if (isFilt) {
+    document.getElementById('lbl-accel').textContent=accelMode==='linear'?'Linear Accel · m/s²':'Accel (filtered) · m/s²';
+    document.getElementById('lbl-gyro').textContent='Angular Velocity · rad/s';
+  } else {
+    document.getElementById('lbl-accel').textContent='Accelerometer · m/s²';
+    document.getElementById('lbl-gyro').textContent='Gyroscope · rad/s';
+    accelMode='filtered';
+    document.getElementById('accel-mode-filt').classList.add('active');
+    document.getElementById('accel-mode-lin').classList.remove('active');
+  }
+  requestAnimationFrame(()=>resize());
 }
 
-// ── Nice interval ──────────────────────────────────────────────────────────
-function niceInterval(rangeMs, targetCount) {
-  const raw = rangeMs / targetCount;
-  const magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
-  const normalized = raw / magnitude;
-  let nice = normalized < 1.5 ? 1 : normalized < 3.5 ? 2 : normalized < 7.5 ? 5 : 10;
-  return nice * magnitude;
+function niceInterval(rangeMs,targetCount) {
+  const raw=rangeMs/targetCount, mag=Math.pow(10,Math.floor(Math.log10(raw))), n=raw/mag;
+  return (n<1.5?1:n<3.5?2:n<7.5?5:10)*mag;
 }
 
-// ── Draw label track ───────────────────────────────────────────────────────
 function drawTrack() {
-  const W = cvTrack.width, H = cvTrack.height;
-  if (!W || !H) return;
-  ctxT.fillStyle = '#0b0f18'; ctxT.fillRect(0,0,W,H);
-  ctxT.strokeStyle = '#1d2a3d'; ctxT.lineWidth = 1;
+  const W=cvTrack.width, H=cvTrack.height; if(!W||!H) return;
+  ctxT.fillStyle='#0b0f18'; ctxT.fillRect(0,0,W,H);
+  ctxT.strokeStyle='#1d2a3d'; ctxT.lineWidth=1;
   ctxT.beginPath(); ctxT.moveTo(0,H/2); ctxT.lineTo(W,H/2); ctxT.stroke();
-
-  labels.forEach(lbl => {
-    const x1 = Math.max(0,msToX(lbl.start_ms,W)), x2 = Math.min(W,msToX(lbl.end_ms,W));
-    if (x2 <= x1) return;
-    const col = labelColor(lbl.label);
-    ctxT.fillStyle = col+'cc'; ctxT.fillRect(x1,2,x2-x1,H-4);
-    if (x2-x1 > 18) {
-      ctxT.font = "bold 8px 'Azeret Mono'"; ctxT.fillStyle = 'rgba(0,0,0,.8)';
-      ctxT.fillText(lbl.label, x1+3, H/2+3);
-    }
+  labels.forEach(lbl=>{
+    const x1=Math.max(0,msToX(lbl.start_ms,W)), x2=Math.min(W,msToX(lbl.end_ms,W));
+    if(x2<=x1) return; const col=labelColor(lbl.label);
+    ctxT.fillStyle=col+'cc'; ctxT.fillRect(x1,2,x2-x1,H-4);
+    if(x2-x1>18){ctxT.font="bold 8px 'Azeret Mono'";ctxT.fillStyle='rgba(0,0,0,.8)';ctxT.fillText(lbl.label,x1+3,H/2+3);}
   });
-
-  if (isDragging && dragStart !== null && dragEnd !== null) {
-    const lo = Math.min(dragStart,dragEnd), hi = Math.max(dragStart,dragEnd);
-    ctxT.fillStyle = '#f59e0b44';
-    ctxT.fillRect(msToX(lo,W), 1, msToX(hi,W)-msToX(lo,W), H-2);
+  if(isDragging&&dragStart!==null&&dragEnd!==null){
+    const lo=Math.min(dragStart,dragEnd),hi=Math.max(dragStart,dragEnd);
+    ctxT.fillStyle='#f59e0b44'; ctxT.fillRect(msToX(lo,W),1,msToX(hi,W)-msToX(lo,W),H-2);
   }
-
-  const cx = msToX(currentMs, W);
-  if (cx >= 0 && cx <= W) {
-    ctxT.strokeStyle = 'rgba(255,255,255,.8)'; ctxT.lineWidth = 1.5;
-    ctxT.beginPath(); ctxT.moveTo(cx,0); ctxT.lineTo(cx,H); ctxT.stroke();
-  }
+  const cx=msToX(currentMs,W);
+  if(cx>=0&&cx<=W){ctxT.strokeStyle='rgba(255,255,255,.8)';ctxT.lineWidth=1.5;ctxT.beginPath();ctxT.moveTo(cx,0);ctxT.lineTo(cx,H);ctxT.stroke();}
 }
 
-// ── Draw minimap ───────────────────────────────────────────────────────────
 function drawMinimap() {
-  const W = cvMinimap.width, H = cvMinimap.height;
-  if (!W || !H) return;
-  ctxMM.fillStyle = '#0b0f18'; ctxMM.fillRect(0,0,W,H);
-
-  const ts   = imuSource === 'filtered' ? filtTimestamps  : timestamps;
-  const chs  = imuSource === 'filtered' ? filtAccelChans  : accelChans;
-  const scl  = imuSource === 'filtered' ? filtAccelScale  : accelScale;
-  const cols = ACCEL_COLORS;
-  const vis  = channelVisible.accel;
-
+  const W=cvMinimap.width, H=cvMinimap.height; if(!W||!H) return;
+  ctxMM.fillStyle='#0b0f18'; ctxMM.fillRect(0,0,W,H);
+  const ts=imuSource==='filtered'?filtTimestamps:timestamps;
+  const chs=imuSource==='filtered'?filtAccelChans:accelChans;
+  const scl=imuSource==='filtered'?filtAccelScale:accelScale;
   if (!ts.length) return;
-  if (scl && ts.length > 1) {
-    const { mn, mx } = scl, rng = mx - mn || 1;
-    const step = Math.max(1, Math.floor(ts.length / W));
-    chs.forEach((ch, ci) => {
-      if (!vis[ci]) return;
-      ctxMM.strokeStyle = cols[ci]+'55'; ctxMM.lineWidth = 0.8;
-      ctxMM.beginPath();
-      let moved = false;
-      for (let i = 0; i < ch.length; i += step) {
-        const x = msToXMM(ts[i], W);
-        const y = H - 2 - ((ch[i]-mn)/rng)*(H-4);
-        if (!moved) { ctxMM.moveTo(x,y); moved=true; } else ctxMM.lineTo(x,y);
+  if (scl&&ts.length>1) {
+    const {mn,mx}=scl, rng=mx-mn||1, step=Math.max(1,Math.floor(ts.length/W));
+    chs.forEach((ch,ci)=>{
+      if(!channelVisible.accel[ci]) return;
+      ctxMM.strokeStyle=ACCEL_COLORS[ci]+'55'; ctxMM.lineWidth=0.8; ctxMM.beginPath();
+      let moved=false;
+      for(let i=0;i<ch.length;i+=step){
+        const x=msToXMM(ts[i],W), y=H-2-((ch[i]-mn)/rng)*(H-4);
+        if(!moved){ctxMM.moveTo(x,y);moved=true;}else ctxMM.lineTo(x,y);
       }
       ctxMM.stroke();
     });
   }
-
-  labels.forEach(lbl => {
-    const x1 = msToXMM(lbl.start_ms,W), x2 = msToXMM(lbl.end_ms,W);
-    ctxMM.fillStyle = labelColor(lbl.label)+'44';
-    ctxMM.fillRect(x1, 0, Math.max(x2-x1,1), H);
+  labels.forEach(lbl=>{
+    const x1=msToXMM(lbl.start_ms,W), x2=msToXMM(lbl.end_ms,W);
+    ctxMM.fillStyle=labelColor(lbl.label)+'44'; ctxMM.fillRect(x1,0,Math.max(x2-x1,1),H);
   });
 }
 
 function updateMinimapOverlay() {
-  if (minTs === maxTs) return;
-  const totalMs = maxTs - minTs;
-  const wMs = effectiveWindow();
-  const x1 = ((viewOffsetMs-minTs)/totalMs)*100;
-  const w  = (wMs/totalMs)*100;
-  const win = document.getElementById('minimap-window');
-  win.style.left  = clamp(x1,0,100)+'%';
-  win.style.width = clamp(w,0,100)+'%';
-  document.getElementById('minimap-cursor').style.left =
-    clamp(((currentMs-minTs)/totalMs)*100, 0, 100)+'%';
+  if (minTs===maxTs) return;
+  const totalMs=maxTs-minTs, wMs=effectiveWindow();
+  const x1=((viewOffsetMs-minTs)/totalMs)*100, w=(wMs/totalMs)*100;
+  const win=document.getElementById('minimap-window');
+  win.style.left=clamp(x1,0,100)+'%'; win.style.width=clamp(w,0,100)+'%';
+  document.getElementById('minimap-cursor').style.left=clamp(((currentMs-minTs)/totalMs)*100,0,100)+'%';
 }
 
-// ── Draw GPS ───────────────────────────────────────────────────────────────
 function drawGPS() {
-  const W = cvGps.width, H = cvGps.height;
-  if (!W || !H) return;
-  ctxGps.fillStyle = '#060810'; ctxGps.fillRect(0,0,W,H);
-  if (gpsData.length < 2) return;
-
-  let mnLat=Infinity, mxLat=-Infinity, mnLon=Infinity, mxLon=-Infinity;
-  gpsData.forEach(p => {
-    if (p.latitude  < mnLat) mnLat = p.latitude;  if (p.latitude  > mxLat) mxLat = p.latitude;
-    if (p.longitude < mnLon) mnLon = p.longitude; if (p.longitude > mxLon) mxLon = p.longitude;
-  });
-
-  const P=0.12, latS=Math.max(mxLat-mnLat,1e-4), lonS=Math.max(mxLon-mnLon,1e-4);
-  const toX = lon => P*W+((lon-mnLon)/lonS)*(1-2*P)*W;
-  const toY = lat => H-(P*H+((lat-mnLat)/latS)*(1-2*P)*H);
-
-  ctxGps.strokeStyle='#0d1420'; ctxGps.lineWidth=1; ctxGps.beginPath();
-  for (let i=1;i<4;i++) { ctxGps.moveTo(W*i/4,0); ctxGps.lineTo(W*i/4,H); ctxGps.moveTo(0,H*i/4); ctxGps.lineTo(W,H*i/4); }
+  const W=cvGps.width, H=cvGps.height; if(!W||!H) return;
+  ctxGps.fillStyle='#060810'; ctxGps.fillRect(0,0,W,H);
+  if (gpsData.length<2) return;
+  let mnLat=Infinity,mxLat=-Infinity,mnLon=Infinity,mxLon=-Infinity;
+  gpsData.forEach(p=>{if(p.latitude<mnLat)mnLat=p.latitude;if(p.latitude>mxLat)mxLat=p.latitude;if(p.longitude<mnLon)mnLon=p.longitude;if(p.longitude>mxLon)mxLon=p.longitude;});
+  const P=0.12,latS=Math.max(mxLat-mnLat,1e-4),lonS=Math.max(mxLon-mnLon,1e-4);
+  const toX=lon=>P*W+((lon-mnLon)/lonS)*(1-2*P)*W;
+  const toY=lat=>H-(P*H+((lat-mnLat)/latS)*(1-2*P)*H);
+  ctxGps.strokeStyle='#0d1420';ctxGps.lineWidth=1;ctxGps.beginPath();
+  for(let i=1;i<4;i++){ctxGps.moveTo(W*i/4,0);ctxGps.lineTo(W*i/4,H);ctxGps.moveTo(0,H*i/4);ctxGps.lineTo(W,H*i/4);}
   ctxGps.stroke();
-
-  let splitIdx = gpsData.findIndex(p => p.timestamp_ms > currentMs);
-  if (splitIdx < 0) splitIdx = gpsData.length;
-  const past = gpsData.slice(0,splitIdx), future = gpsData.slice(splitIdx);
-
-  const drawPath = (pts,col,lw) => {
-    if (pts.length < 2) return;
-    ctxGps.beginPath();
-    pts.forEach((p,i) => { const x=toX(p.longitude),y=toY(p.latitude); i===0?ctxGps.moveTo(x,y):ctxGps.lineTo(x,y); });
-    ctxGps.strokeStyle=col; ctxGps.lineWidth=lw; ctxGps.stroke();
+  let splitIdx=gpsData.findIndex(p=>p.timestamp_ms>currentMs); if(splitIdx<0) splitIdx=gpsData.length;
+  const past=gpsData.slice(0,splitIdx),future=gpsData.slice(splitIdx);
+  const drawPath=(pts,col,lw)=>{
+    if(pts.length<2) return; ctxGps.beginPath();
+    pts.forEach((p,i)=>{const x=toX(p.longitude),y=toY(p.latitude);i===0?ctxGps.moveTo(x,y):ctxGps.lineTo(x,y);});
+    ctxGps.strokeStyle=col;ctxGps.lineWidth=lw;ctxGps.stroke();
   };
-  drawPath(future,'#1d2a3d',1.5);
-  drawPath(past,  '#4ade80',1.5);
-
-  if (past.length > 0) {
-    const last=past[past.length-1], lx=toX(last.longitude), ly=toY(last.latitude);
-    ctxGps.beginPath(); ctxGps.arc(lx,ly,5,0,Math.PI*2); ctxGps.fillStyle='#4ade80'; ctxGps.fill();
-    ctxGps.beginPath(); ctxGps.arc(lx,ly,9,0,Math.PI*2); ctxGps.strokeStyle='#4ade8055'; ctxGps.lineWidth=2; ctxGps.stroke();
+  drawPath(future,'#1d2a3d',1.5); drawPath(past,'#4ade80',1.5);
+  if(past.length>0){
+    const last=past[past.length-1],lx=toX(last.longitude),ly=toY(last.latitude);
+    ctxGps.beginPath();ctxGps.arc(lx,ly,5,0,Math.PI*2);ctxGps.fillStyle='#4ade80';ctxGps.fill();
+    ctxGps.beginPath();ctxGps.arc(lx,ly,9,0,Math.PI*2);ctxGps.strokeStyle='#4ade8055';ctxGps.lineWidth=2;ctxGps.stroke();
   }
 }
 
-// ── GPS display ────────────────────────────────────────────────────────────
 function syncGPSDisplay() {
   if (!gpsData.length) return;
-  let lo=0, hi=gpsData.length-1;
-  while (lo<hi) { const m=(lo+hi)>>1; gpsData[m].timestamp_ms<currentMs?lo=m+1:hi=m; }
+  let lo=0,hi=gpsData.length-1;
+  while(lo<hi){const m=(lo+hi)>>1;gpsData[m].timestamp_ms<currentMs?lo=m+1:hi=m;}
   const p=gpsData[lo];
-  setText('gv-lat', p.latitude.toFixed(6),  false);
-  setText('gv-lon', p.longitude.toFixed(6), false);
-  setText('gv-spd', p.speed_mps.toFixed(2), false);
-  setText('gv-alt', p.altitude_m.toFixed(1),false);
+  setText('gv-lat',p.latitude.toFixed(6),false); setText('gv-lon',p.longitude.toFixed(6),false);
+  setText('gv-spd',p.speed_mps.toFixed(2),false); setText('gv-alt',p.altitude_m.toFixed(1),false);
 }
-function setText(id, val, isNone) {
+function setText(id,val,isNone) {
   const el=document.getElementById(id); el.textContent=val; el.classList.toggle('none',isNone);
 }
 
-// ── Frame sync ─────────────────────────────────────────────────────────────
 function syncFrame() {
   if (!frameTs.length) return;
-
-  let lo = 0, hi = frameTs.length - 1;
-  while (lo < hi) {
-    const m = (lo + hi + 1) >> 1;
-    frameTs[m].timestamp_ms <= currentMs ? lo = m : hi = m - 1;
-  }
-  const idx = frameTs[lo].frame_idx;
-
-  if (idx === lastShownFrame) return;
-  lastShownFrame = idx;
-
-  const img = document.getElementById('frame-img');
-  if (session && session.has_video) {
-    img.src = `/session/${session.session_id}/frame/${idx}`;
-    img.style.display = 'block';
-    document.getElementById('vid-nosig').style.display = 'none';
-  } else {
-    img.style.display = 'none';
-    document.getElementById('vid-nosig').style.display = 'flex';
-  }
+  let lo=0,hi=frameTs.length-1;
+  while(lo<hi){const m=(lo+hi+1)>>1;frameTs[m].timestamp_ms<=currentMs?lo=m:hi=m-1;}
+  const idx=frameTs[lo].frame_idx; if(idx===lastShownFrame) return; lastShownFrame=idx;
+  const img=document.getElementById('frame-img');
+  if (session&&session.has_video) {
+    img.src=`/session/${session.session_id}/frame/${idx}`;
+    img.style.display='block'; document.getElementById('vid-nosig').style.display='none';
+  } else { img.style.display='none'; document.getElementById('vid-nosig').style.display='flex'; }
 }
 
-// ── Seek ───────────────────────────────────────────────────────────────────
 function seekTo(ms) {
-  currentMs = clamp(ms, minTs, maxTs);
-  autoFollow = true;
+  currentMs=clamp(ms,minTs,maxTs); autoFollow=true;
   if (!playing) updateAutoFollow();
-  const frac = (currentMs-minTs)/(maxTs-minTs);
-  document.getElementById('scrubber').value = Math.round(frac*10000);
+  const frac=(currentMs-minTs)/(maxTs-minTs);
+  document.getElementById('scrubber').value=Math.round(frac*10000);
   updateTimeDisplay(); syncFrame(); syncGPSDisplay(); buildTicks();
-  _lastVideoSync = currentMs;
+  _lastVideoSync=currentMs;
 }
-
 function updateTimeDisplay() {
-  if (minTs===maxTs) { document.getElementById('time-disp').textContent='— / —'; return; }
+  if (minTs===maxTs){document.getElementById('time-disp').textContent='— / —';return;}
   const e=(currentMs-minTs)/1000, t=(maxTs-minTs)/1000;
   const f=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${(s%60).toFixed(1).padStart(4,'0')}`;
   document.getElementById('time-disp').textContent=`${f(e)} / ${f(t)}`;
 }
-
-function onScrub(v) {
-  if (minTs===maxTs) return;
-  seekTo(minTs + (v/10000)*(maxTs-minTs));
-}
-
+function onScrub(v) { if(minTs===maxTs)return; seekTo(minTs+(v/10000)*(maxTs-minTs)); }
 function seekPrev() {
-  if (!labels.length) return;
-  const sorted=[...labels].sort((a,b)=>a.start_ms-b.start_ms);
-  const prev=[...sorted].reverse().find(l=>l.start_ms<currentMs-100);
-  if (prev) seekTo(prev.start_ms);
+  if(!labels.length)return;
+  const prev=[...labels].sort((a,b)=>a.start_ms-b.start_ms).reverse().find(l=>l.start_ms<currentMs-100);
+  if(prev) seekTo(prev.start_ms);
 }
 function seekNext() {
-  if (!labels.length) return;
-  const sorted=[...labels].sort((a,b)=>a.start_ms-b.start_ms);
-  const next=sorted.find(l=>l.start_ms>currentMs+100);
-  if (next) seekTo(next.start_ms);
+  if(!labels.length)return;
+  const next=[...labels].sort((a,b)=>a.start_ms-b.start_ms).find(l=>l.start_ms>currentMs+100);
+  if(next) seekTo(next.start_ms);
 }
-
-// ── Play / Pause ───────────────────────────────────────────────────────────
 function togglePlay() {
-  if (minTs===maxTs) return;
-  playing=!playing; autoFollow=true;
+  if(minTs===maxTs)return; playing=!playing; autoFollow=true;
   const btn=document.getElementById('btn-play');
-  btn.classList.toggle('playing',playing);
-  btn.textContent=playing?'⏸':'▶';
-  if (playing) _lastFrameT=0;
+  btn.classList.toggle('playing',playing); btn.textContent=playing?'⏸':'▶';
+  if(playing)_lastFrameT=0;
 }
-function setSpeed(v) { speed=parseFloat(v); }
+function setSpeed(v){speed=parseFloat(v);}
 
-// ── Chart events ───────────────────────────────────────────────────────────
 function setupChartEvents(cv) {
-  cv.addEventListener('mousedown', e => {
-    if (minTs===maxTs) return;
-    const rect=cv.getBoundingClientRect();
-    const x=(e.clientX-rect.left)*cv.width/rect.width;
-    if (drawMode) {
-      dragStart=xToMs(x,cv.width); dragEnd=dragStart; isDragging=true;
-    } else {
-      isPanning=true; panStartX=e.clientX; panStartOff=viewOffsetMs;
-      autoFollow=false; cv.style.cursor='grabbing';
-      document.body.classList.add('pan-active');
-    }
+  cv.addEventListener('mousedown',e=>{
+    if(minTs===maxTs)return;
+    const rect=cv.getBoundingClientRect(), x=(e.clientX-rect.left)*cv.width/rect.width;
+    if(drawMode){dragStart=xToMs(x,cv.width);dragEnd=dragStart;isDragging=true;}
+    else{isPanning=true;panStartX=e.clientX;panStartOff=viewOffsetMs;autoFollow=false;cv.style.cursor='grabbing';document.body.classList.add('pan-active');}
   });
-
-  cv.addEventListener('mousemove', e => {
-    if (minTs===maxTs) return;
-    if (isDragging) {
-      const rect=cv.getBoundingClientRect();
-      dragEnd=xToMs((e.clientX-rect.left)*cv.width/rect.width, cv.width);
-    } else if (isPanning) {
-      const dx=e.clientX-panStartX, wMs=effectiveWindow();
-      viewOffsetMs=clamp(panStartOff-(dx/cv.getBoundingClientRect().width)*wMs, minTs, Math.max(minTs,maxTs-wMs));
-      buildTicks();
-    }
+  cv.addEventListener('mousemove',e=>{
+    if(minTs===maxTs)return;
+    if(isDragging){const rect=cv.getBoundingClientRect();dragEnd=xToMs((e.clientX-rect.left)*cv.width/rect.width,cv.width);}
+    else if(isPanning){const dx=e.clientX-panStartX,wMs=effectiveWindow();viewOffsetMs=clamp(panStartOff-(dx/cv.getBoundingClientRect().width)*wMs,minTs,Math.max(minTs,maxTs-wMs));buildTicks();}
   });
-
-  cv.addEventListener('mouseup', e => {
-    const rect=cv.getBoundingClientRect();
-    const x=(e.clientX-rect.left)*cv.width/rect.width;
-    if (isDragging) {
-      isDragging=false;
-      const lo=Math.min(dragStart,dragEnd), hi=Math.max(dragStart,dragEnd);
-      if (hi-lo > 80) { pendingSel={start_ms:lo,end_ms:hi}; openPopup(lo,hi); }
+  cv.addEventListener('mouseup',e=>{
+    const rect=cv.getBoundingClientRect(), x=(e.clientX-rect.left)*cv.width/rect.width;
+    if(isDragging){
+      isDragging=false; const lo=Math.min(dragStart,dragEnd),hi=Math.max(dragStart,dragEnd);
+      if(hi-lo>80){pendingSel={start_ms:lo,end_ms:hi};openPopup(lo,hi);}
       dragStart=dragEnd=null;
-    } else if (isPanning) {
-      isPanning=false; cv.style.cursor=drawMode?'crosshair':'default';
-      document.body.classList.remove('pan-active');
-      if (Math.abs(e.clientX-panStartX)<4 && !drawMode)
-        seekTo(clamp(xToMs(x,cv.width),minTs,maxTs));
+    } else if(isPanning){
+      isPanning=false;cv.style.cursor=drawMode?'crosshair':'default';document.body.classList.remove('pan-active');
+      if(Math.abs(e.clientX-panStartX)<4&&!drawMode) seekTo(clamp(xToMs(x,cv.width),minTs,maxTs));
     }
   });
-
-  cv.addEventListener('mouseleave', () => {
-    if (isDragging) { isDragging=false; dragStart=dragEnd=null; }
-    if (isPanning)  { isPanning=false; cv.style.cursor=drawMode?'crosshair':'default'; document.body.classList.remove('pan-active'); }
+  cv.addEventListener('mouseleave',()=>{
+    if(isDragging){isDragging=false;dragStart=dragEnd=null;}
+    if(isPanning){isPanning=false;cv.style.cursor=drawMode?'crosshair':'default';document.body.classList.remove('pan-active');}
   });
-
-  cv.addEventListener('wheel', e => {
-    if (minTs===maxTs) return;
-    e.preventDefault();
-    const rect=cv.getBoundingClientRect();
-    const focalMs=xToMs((e.clientX-rect.left)*cv.width/rect.width, cv.width);
-    const factor=e.deltaY>0?1.25:0.8;
-    const newW=clamp(effectiveWindow()*factor, 500, maxTs-minTs);
-    setZoom(newW>(maxTs-minTs)*0.95?0:newW, focalMs);
-    buildTicks(); autoFollow=false;
-  }, { passive:false });
+  cv.addEventListener('wheel',e=>{
+    if(minTs===maxTs)return; e.preventDefault();
+    const rect=cv.getBoundingClientRect(), focalMs=xToMs((e.clientX-rect.left)*cv.width/rect.width,cv.width);
+    const factor=e.deltaY>0?1.25:0.8, newW=clamp(effectiveWindow()*factor,500,maxTs-minTs);
+    setZoom(newW>(maxTs-minTs)*0.95?0:newW,focalMs); buildTicks(); autoFollow=false;
+  },{passive:false});
 }
+setupChartEvents(cvAccel); setupChartEvents(cvGyro);
+setupChartEvents(cvOrient); setupChartEvents(cvGpsSpeed);
 
-setupChartEvents(cvAccel);
-setupChartEvents(cvGyro);
-setupChartEvents(cvLinAcc);
-setupChartEvents(cvOrient);
-
-// ── Minimap ────────────────────────────────────────────────────────────────
 const minimapWrap=document.getElementById('minimap-wrap');
-minimapWrap.addEventListener('mousedown', e => {
-  if (minTs===maxTs) return;
+minimapWrap.addEventListener('mousedown',e=>{
+  if(minTs===maxTs)return;
   const rect=minimapWrap.getBoundingClientRect();
   seekTo(clamp(xToMsMM(e.clientX-rect.left,rect.width),minTs,maxTs));
 });
-minimapWrap.addEventListener('mousemove', e => {
-  if (e.buttons!==1||minTs===maxTs) return;
+minimapWrap.addEventListener('mousemove',e=>{
+  if(e.buttons!==1||minTs===maxTs)return;
   const rect=minimapWrap.getBoundingClientRect();
   seekTo(clamp(xToMsMM(e.clientX-rect.left,rect.width),minTs,maxTs));
 });
 
-// ── Track click ────────────────────────────────────────────────────────────
-cvTrack.addEventListener('click', e => {
-  if (minTs===maxTs) return;
-  const rect=cvTrack.getBoundingClientRect();
-  const ms=xToMs((e.clientX-rect.left)*cvTrack.width/rect.width, cvTrack.width);
+cvTrack.addEventListener('click',e=>{
+  if(minTs===maxTs)return;
+  const rect=cvTrack.getBoundingClientRect(), ms=xToMs((e.clientX-rect.left)*cvTrack.width/rect.width,cvTrack.width);
   const hit=labels.find(l=>ms>=l.start_ms&&ms<=l.end_ms);
   seekTo(hit?hit.start_ms:clamp(ms,minTs,maxTs));
 });
 
-// ── Draw mode ──────────────────────────────────────────────────────────────
 function toggleDraw() {
   drawMode=!drawMode;
   const pill=document.getElementById('draw-pill');
-  pill.classList.toggle('on',drawMode);
-  pill.textContent=drawMode?'⬡ Draw ON':'Draw';
-  document.getElementById('chart-hint').textContent=
-    drawMode?'drag to create label · scroll=zoom · [D] exit':'scroll=zoom · drag=pan · [D] draw labels';
-  [cvAccel,cvGyro,cvLinAcc,cvOrient].forEach(cv=>cv.style.cursor=drawMode?'crosshair':'default');
+  pill.classList.toggle('on',drawMode); pill.textContent=drawMode?'⬡ Draw ON':'Draw';
+  document.getElementById('chart-hint').textContent=drawMode?'drag to create label · scroll=zoom · [D] exit':'scroll=zoom · drag=pan · [D] draw labels';
+  [cvAccel,cvGyro,cvOrient,cvGpsSpeed].forEach(cv=>cv.style.cursor=drawMode?'crosshair':'default');
 }
 
-// ── Popup ──────────────────────────────────────────────────────────────────
-function openPopup(start, end) {
+function openPopup(start,end) {
   const dur=((end-start)/1000).toFixed(2), s=v=>(v/1000).toFixed(2);
   document.getElementById('popup-range').textContent=`${s(start)}s → ${s(end)}s  ·  ${dur}s`;
   document.getElementById('popup-input').value='';
   document.getElementById('overlay').classList.add('show');
   setTimeout(()=>document.getElementById('popup-input').focus(),30);
 }
-function closePopup() { document.getElementById('overlay').classList.remove('show'); pendingSel=null; }
-function onOverlayClick(e) { if (e.target===document.getElementById('overlay')) closePopup(); }
-function confirmPopup() {
+function closePopup(){document.getElementById('overlay').classList.remove('show');pendingSel=null;}
+function onOverlayClick(e){if(e.target===document.getElementById('overlay'))closePopup();}
+function confirmPopup(){
   const name=document.getElementById('popup-input').value.trim();
-  if (!name) { document.getElementById('popup-input').focus(); return; }
-  if (!pendingSel) return;
+  if(!name){document.getElementById('popup-input').focus();return;}
+  if(!pendingSel)return;
   labels.push({id:labelId++,label:name,start_ms:pendingSel.start_ms,end_ms:pendingSel.end_ms});
-  labelColor(name); markDirty(); closePopup(); renderLabelList();
+  labelColor(name);markDirty();closePopup();renderLabelList();
 }
-function popupKey(e) { if (e.key==='Enter') confirmPopup(); if (e.key==='Escape') closePopup(); }
-function setQ(name) { document.getElementById('popup-input').value=name; document.getElementById('popup-input').focus(); }
+function popupKey(e){if(e.key==='Enter')confirmPopup();if(e.key==='Escape')closePopup();}
+function setQ(name){document.getElementById('popup-input').value=name;document.getElementById('popup-input').focus();}
 
-// ── Label list ─────────────────────────────────────────────────────────────
 function renderLabelList() {
-  const list=document.getElementById('label-list'), empty=document.getElementById('label-empty');
+  const list=document.getElementById('label-list'),empty=document.getElementById('label-empty');
   list.querySelectorAll('.l-item').forEach(el=>el.remove());
   const sorted=[...labels].sort((a,b)=>a.start_ms-b.start_ms);
   document.getElementById('label-count').textContent=`(${sorted.length})`;
   empty.style.display=sorted.length?'none':'block';
   sorted.forEach(lbl=>{
-    const col=labelColor(lbl.label), dur=((lbl.end_ms-lbl.start_ms)/1000).toFixed(2), f=v=>(v/1000).toFixed(2);
+    const col=labelColor(lbl.label),dur=((lbl.end_ms-lbl.start_ms)/1000).toFixed(2),f=v=>(v/1000).toFixed(2);
     const el=document.createElement('div'); el.className='l-item'; el.style.borderLeftColor=col;
     el.innerHTML=`<div class="l-row"><span class="l-name" style="color:${col}">${lbl.label}</span>
       <button class="l-del" onclick="deleteLabel(${lbl.id},event)">✕</button></div>
@@ -1447,88 +1395,66 @@ function renderLabelList() {
     list.appendChild(el);
   });
 }
-function deleteLabel(id,e) {
-  e.stopPropagation(); labels=labels.filter(l=>l.id!==id); markDirty(); renderLabelList();
-}
-function markDirty() {
+function deleteLabel(id,e){e.stopPropagation();labels=labels.filter(l=>l.id!==id);markDirty();renderLabelList();}
+function markDirty(){
   dirty=true;
   document.getElementById('save-btn').className='save-btn dirty';
   document.getElementById('save-btn').textContent='Save Labels';
   document.getElementById('save-btn').disabled=!session;
 }
 
-// ── Save ───────────────────────────────────────────────────────────────────
 async function saveLabels() {
-  if (!session) return;
-  const btn=document.getElementById('save-btn'); btn.textContent='Saving…';
+  if(!session)return;
+  const btn=document.getElementById('save-btn');btn.textContent='Saving…';
   try {
     await fetch(`/session/${session.session_id}/labels`,{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(labels.map(l=>({
-        label:l.label, start_ms:Math.round(l.start_ms), end_ms:Math.round(l.end_ms),
-        duration_ms:Math.round(l.end_ms-l.start_ms)
-      })))
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(labels.map(l=>({label:l.label,start_ms:Math.round(l.start_ms),end_ms:Math.round(l.end_ms),duration_ms:Math.round(l.end_ms-l.start_ms)})))
     });
-    dirty=false; btn.textContent='✓ Saved'; btn.className='save-btn saved';
-    setTimeout(()=>{btn.textContent='Save Labels'; btn.className='save-btn';},2200);
-  } catch(err) {
-    btn.textContent='✗ Error';
-    setTimeout(()=>{btn.textContent='Save Labels'; btn.className='save-btn dirty';},2000);
-  }
+    dirty=false;btn.textContent='✓ Saved';btn.className='save-btn saved';
+    setTimeout(()=>{btn.textContent='Save Labels';btn.className='save-btn';},2200);
+  } catch(err){btn.textContent='✗ Error';setTimeout(()=>{btn.textContent='Save Labels';btn.className='save-btn dirty';},2000);}
 }
 
-// ── CSV parsing ────────────────────────────────────────────────────────────
 function parseCSV(text) {
-  const lines=text.trim().split('\n');
-  if (lines.length<2) return [];
+  const lines=text.trim().split('\n'); if(lines.length<2)return[];
   const headers=lines[0].split(',').map(h=>h.trim());
   return lines.slice(1).filter(Boolean).map(line=>{
-    const vals=line.split(','), obj={};
-    headers.forEach((h,i)=>{
-      const v=vals[i]?.trim();
-      obj[h]=(v!==undefined&&v!==''&&!isNaN(+v))?parseFloat(v):(v||'');
-    });
+    const vals=line.split(','),obj={};
+    headers.forEach((h,i)=>{const v=vals[i]?.trim();obj[h]=(v!==undefined&&v!==''&&!isNaN(+v))?parseFloat(v):(v||'');});
     return obj;
   });
 }
-async function fetchCSV(path) {
+async function fetchCSV(path){
   const rel=path.replace(/^data[\/\\]/,'');
   return fetch(`/data/${rel}`).then(r=>r.text()).then(parseCSV).catch(()=>[]);
 }
 
-// ── Parse filtered IMU ─────────────────────────────────────────────────────
 function parseFilteredIMU(rows) {
-  if (!rows.length) return false;
-  const rawT0 = rows[0].t;
-  let tFactor = 1;
-  if (rawT0 > 1e9)       tFactor = 1/1000;
-  else if (rawT0 < 1e4)  tFactor = 1000;
-
-  filtTimestamps  = rows.map(r => r.t * tFactor);
-  filtGyroChans   = [rows.map(r=>r.gx), rows.map(r=>r.gy), rows.map(r=>r.gz)];
-  filtAccelChans  = [rows.map(r=>r.ax), rows.map(r=>r.ay), rows.map(r=>r.az)];
-  filtLinAccChans = [rows.map(r=>r.alin_x), rows.map(r=>r.alin_y), rows.map(r=>r.alin_z)];
-  filtOrientChans = [rows.map(r=>r.roll), rows.map(r=>r.pitch), rows.map(r=>r.yaw)];
-
-  filtAccelScale  = computeScale(filtAccelChans,  channelVisible.accel);
-  filtGyroScale   = computeScale(filtGyroChans,   channelVisible.gyro);
-  filtLinAccScale = computeScale(filtLinAccChans, channelVisible.linacc);
-  filtOrientScale = computeScale(filtOrientChans, channelVisible.orient);
-
-  console.log('✅ Filtered IMU loaded:', filtTimestamps.length, 'rows');
+  if(!rows.length)return false;
+  const rawT0=rows[0].t; let tFactor=1;
+  if(rawT0>1e9)tFactor=1/1000; else if(rawT0<1e4)tFactor=1000;
+  filtTimestamps  =rows.map(r=>r.t*tFactor);
+  filtGyroChans   =[rows.map(r=>r.gx),rows.map(r=>r.gy),rows.map(r=>r.gz)];
+  filtAccelChans  =[rows.map(r=>r.ax),rows.map(r=>r.ay),rows.map(r=>r.az)];
+  filtLinAccChans =[rows.map(r=>r.alin_x),rows.map(r=>r.alin_y),rows.map(r=>r.alin_z)];
+  filtOrientChans =[rows.map(r=>r.roll),rows.map(r=>r.pitch),rows.map(r=>r.yaw)];
+  filtAccelScale  =computeScale(filtAccelChans,channelVisible.accel);
+  filtGyroScale   =computeScale(filtGyroChans, channelVisible.gyro);
+  filtLinAccScale =computeScale(filtLinAccChans,channelVisible.linacc);
+  filtOrientScale =computeScale(filtOrientChans,channelVisible.orient);
   return true;
 }
 
-// ── Session list ───────────────────────────────────────────────────────────
 async function loadSessions() {
   const list=document.getElementById('session-list');
   try {
     const data=await fetch('/sessions').then(r=>r.json());
     list.innerHTML='';
     document.getElementById('session-count').textContent=`(${data.length})`;
-    if (!data.length) { list.innerHTML='<div class="empty-hint">No sessions found</div>'; return; }
+    if(!data.length){list.innerHTML='<div class="empty-hint">No sessions found</div>';return;}
     data.forEach(s=>{
-      const el=document.createElement('div'); el.className='s-item';
+      const el=document.createElement('div');el.className='s-item';
       el.innerHTML=`<div class="s-name">${s.session_id}</div>
         <div class="s-badges">
           <span class="badge ${s.gps?'ok':''}">GPS</span>
@@ -1540,11 +1466,10 @@ async function loadSessions() {
       el.onclick=()=>loadSession(s,el);
       list.appendChild(el);
     });
-  } catch(e) { list.innerHTML='<div class="empty-hint">Cannot reach server</div>'; }
+  } catch(e){list.innerHTML='<div class="empty-hint">Cannot reach server</div>';}
 }
 
-// ── Load session ───────────────────────────────────────────────────────────
-async function loadSession(s, el) {
+async function loadSession(s,el) {
   playing=false;
   document.getElementById('btn-play').classList.remove('playing');
   document.getElementById('btn-play').textContent='▶';
@@ -1552,81 +1477,61 @@ async function loadSession(s, el) {
   el.classList.add('active');
   document.getElementById('loading').classList.add('show');
 
-  autoScaleChart = { accel: false, gyro: false, linacc: false, orient: false };
-  ['accel','gyro','linacc','orient'].forEach(name => {
-    channelVisible[name] = [true, true, true];
-    for (let i = 0; i < 3; i++) {
-      const btn = document.getElementById(`ch-${name}-${i}`);
-      if (btn) btn.classList.add('active');
-    }
+  autoScaleChart={accel:false,gyro:false,linacc:false,orient:false,gpsspeed:false};
+  ['accel','gyro','linacc','orient'].forEach(name=>{
+    channelVisible[name]=[true,true,true];
+    for(let i=0;i<3;i++){const btn=document.getElementById(`ch-${name}-${i}`);if(btn)btn.classList.add('active');}
   });
 
   try {
-    if (!s.imu) throw new Error('No IMU data');
-    imuData=await fetchCSV(s.imu);
-    if (!imuData.length) throw new Error('IMU CSV empty');
+    if(!s.imu)throw new Error('No IMU data');
+    imuData=await fetchCSV(s.imu); if(!imuData.length)throw new Error('IMU CSV empty');
+    minTs=imuData[0].timestamp_ms; maxTs=imuData[imuData.length-1].timestamp_ms;
+    timestamps  =imuData.map(r=>r.timestamp_ms);
+    accelChans  =[imuData.map(r=>r.accel_x),imuData.map(r=>r.accel_y),imuData.map(r=>r.accel_z)];
+    gyroChans   =[imuData.map(r=>r.gyro_x), imuData.map(r=>r.gyro_y), imuData.map(r=>r.gyro_z)];
+    accelScale  =computeScale(accelChans); gyroScale=computeScale(gyroChans);
 
-    minTs=imuData[0].timestamp_ms;
-    maxTs=imuData[imuData.length-1].timestamp_ms;
-    timestamps  = imuData.map(r=>r.timestamp_ms);
-    accelChans  = [imuData.map(r=>r.accel_x), imuData.map(r=>r.accel_y), imuData.map(r=>r.accel_z)];
-    gyroChans   = [imuData.map(r=>r.gyro_x),  imuData.map(r=>r.gyro_y),  imuData.map(r=>r.gyro_z)];
-    accelScale  = computeScale(accelChans);
-    gyroScale   = computeScale(gyroChans);
+    hasFiltered=false;
+    filtTimestamps=[];filtAccelChans=[[],[],[]];filtGyroChans=[[],[],[]];
+    filtLinAccChans=[[],[],[]];filtOrientChans=[[],[],[]];
+    filtAccelScale=filtGyroScale=filtLinAccScale=filtOrientScale=null;
 
-    hasFiltered = false;
-    filtTimestamps = []; filtAccelChans = [[],[],[]]; filtGyroChans = [[],[],[]];
-    filtLinAccChans = [[],[],[]]; filtOrientChans = [[],[],[]];
-    filtAccelScale = filtGyroScale = filtLinAccScale = filtOrientScale = null;
+    if(s.imu_filtered){const fData=await fetchCSV(s.imu_filtered);if(fData.length)hasFiltered=parseFilteredIMU(fData);}
 
-    if (s.imu_filtered) {
-      const fData = await fetchCSV(s.imu_filtered);
-      if (fData.length) hasFiltered = parseFilteredIMU(fData);
-    }
+    document.getElementById('src-filtered').disabled=!hasFiltered;
+    setImuSource('raw'); accelMode='filtered';
 
-    document.getElementById('src-filtered').disabled = !hasFiltered;
-    setImuSource('raw');
-
-    viewOffsetMs=minTs; autoFollow=true;
+    viewOffsetMs=minTs;autoFollow=true;
     windowMs=(maxTs-minTs)<=12000?0:10000;
     document.getElementById('zoom-sel').value=windowMs===0?'0':String(windowMs);
 
     gpsData=s.gps?await fetchCSV(s.gps):[];
     document.getElementById('gps-nofix').style.display=gpsData.length?'none':'flex';
-    if (!gpsData.length) ['gv-lat','gv-lon','gv-spd','gv-alt'].forEach(id=>setText(id,'—',true));
+    if(!gpsData.length)['gv-lat','gv-lon','gv-spd','gv-alt'].forEach(id=>setText(id,'—',true));
 
-    frameTs = []; framesDir = null; lastShownFrame = -1;
-    if (s.frame_ts) {
-      const rawFt = await fetchCSV(s.frame_ts);
-      if (rawFt.length) {
-        const camT0 = rawFt[0].timestamp_ms, imuT0 = minTs;
-        frameTs = rawFt.map(r => ({
-          frame_idx: Math.round(r.frame_idx),
-          timestamp_ms: r.timestamp_ms - camT0 + imuT0
-        }));
+    gpsSpeedScale=computeGpsSpeedScale();
+    document.getElementById('row-gpsspeed').style.display=gpsData.length?'':'none';
+
+    frameTs=[];framesDir=null;lastShownFrame=-1;
+    if(s.frame_ts){
+      const rawFt=await fetchCSV(s.frame_ts);
+      if(rawFt.length){
+        const camT0=rawFt[0].timestamp_ms,imuT0=minTs;
+        frameTs=rawFt.map(r=>({frame_idx:Math.round(r.frame_idx),timestamp_ms:r.timestamp_ms-camT0+imuT0}));
       }
     }
 
     Object.keys(colorMap).forEach(k=>delete colorMap[k]);
-    colorIdx=0; labelId=0;
-    if (s.labels) {
-      const raw=await fetchCSV(s.labels);
-      labels=raw.map((r,i)=>({id:i,label:r.label,start_ms:r.start_ms,end_ms:r.end_ms}));
-      labelId=labels.length; labels.forEach(l=>labelColor(l.label));
-    } else { labels=[]; }
+    colorIdx=0;labelId=0;
+    if(s.labels){const raw=await fetchCSV(s.labels);labels=raw.map((r,i)=>({id:i,label:r.label,start_ms:r.start_ms,end_ms:r.end_ms}));labelId=labels.length;labels.forEach(l=>labelColor(l.label));}
+    else labels=[];
 
-    const img = document.getElementById('frame-img');
-    if (framesDir) {
-      img.style.display = 'block';
-      document.getElementById('vid-nosig').style.display = 'none';
-    } else {
-      img.style.display = 'none';
-      document.getElementById('vid-nosig').style.display = 'flex';
-    }
+    const img=document.getElementById('frame-img');
+    img.style.display='none'; document.getElementById('vid-nosig').style.display='flex';
 
-    session=s; dirty=false; currentMs=minTs;
-    document.getElementById('scrubber').disabled=false;
-    document.getElementById('scrubber').value=0;
+    session=s;dirty=false;currentMs=minTs;
+    document.getElementById('scrubber').disabled=false; document.getElementById('scrubber').value=0;
     ['btn-play','btn-prev','btn-next'].forEach(id=>document.getElementById(id).disabled=false);
     document.getElementById('save-btn').disabled=false;
     document.getElementById('save-btn').className='save-btn';
@@ -1634,10 +1539,10 @@ async function loadSession(s, el) {
     document.getElementById('session-title').innerHTML=`Session: <span class="sid">${s.session_id}</span>`;
 
     updateAutoscaleButtons();
-    seekTo(minTs); buildTicks(); renderLabelList();
-    drawMinimap(); updateWindowInfo(); updateMinimapOverlay();
-
-  } catch(err) {
+    seekTo(minTs);buildTicks();renderLabelList();
+    drawMinimap();updateWindowInfo();updateMinimapOverlay();
+    requestAnimationFrame(()=>resize());
+  } catch(err){
     console.error('[loadSession]',err);
     document.getElementById('session-title').textContent=`Error: ${err.message}`;
   } finally {
@@ -1645,31 +1550,23 @@ async function loadSession(s, el) {
   }
 }
 
-// ── Keyboard shortcuts ─────────────────────────────────────────────────────
-document.addEventListener('keydown', e => {
-  if (e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
-  if (e.code==='Space')  { e.preventDefault(); togglePlay(); }
-  if (e.code==='KeyD')   { toggleDraw(); }
-  if ((e.ctrlKey||e.metaKey)&&e.code==='KeyS') { e.preventDefault(); saveLabels(); }
-  if (e.code==='ArrowLeft')  { e.preventDefault(); seekTo(currentMs-500); }
-  if (e.code==='ArrowRight') { e.preventDefault(); seekTo(currentMs+500); }
-  if (e.code==='Comma')  seekPrev();
-  if (e.code==='Period') seekNext();
-  if (e.code==='Escape') closePopup();
-  if (e.code==='Equal'||e.code==='NumpadAdd') {
-    setZoom(Math.max(effectiveWindow()*0.7,500),currentMs); buildTicks(); autoFollow=false;
-  }
-  if (e.code==='Minus'||e.code==='NumpadSubtract') {
-    const newW=effectiveWindow()*1.4;
-    setZoom(newW>(maxTs-minTs)*0.95?0:newW,currentMs); buildTicks(); autoFollow=false;
-  }
-  if (e.code==='KeyF') { autoFollow=true; updateAutoFollow(); buildTicks(); }
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
+  if(e.code==='Space'){e.preventDefault();togglePlay();}
+  if(e.code==='KeyD'){toggleDraw();}
+  if((e.ctrlKey||e.metaKey)&&e.code==='KeyS'){e.preventDefault();saveLabels();}
+  if(e.code==='ArrowLeft'){e.preventDefault();seekTo(currentMs-500);}
+  if(e.code==='ArrowRight'){e.preventDefault();seekTo(currentMs+500);}
+  if(e.code==='Comma')seekPrev(); if(e.code==='Period')seekNext();
+  if(e.code==='Escape')closePopup();
+  if(e.code==='Equal'||e.code==='NumpadAdd'){setZoom(Math.max(effectiveWindow()*0.7,500),currentMs);buildTicks();autoFollow=false;}
+  if(e.code==='Minus'||e.code==='NumpadSubtract'){const newW=effectiveWindow()*1.4;setZoom(newW>(maxTs-minTs)*0.95?0:newW,currentMs);buildTicks();autoFollow=false;}
+  if(e.code==='KeyF'){autoFollow=true;updateAutoFollow();buildTicks();}
 });
 
-// ── Init ───────────────────────────────────────────────────────────────────
 buildAllLegends();
 resize();
-_raf = requestAnimationFrame(mainLoop);
+_raf=requestAnimationFrame(mainLoop);
 loadSessions();
 </script>
 </body>

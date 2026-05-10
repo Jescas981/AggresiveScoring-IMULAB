@@ -35,6 +35,11 @@ class EKFProcessor:
         gyro_raw = row[["gyro_x", "gyro_y", "gyro_z"]].values.astype(float)
         acc_raw = row[["accel_x", "accel_y", "accel_z"]].values.astype(float)
 
+        # ── Convert sensor frame → standard body frame ──
+        gyro_raw = -gyro_raw
+        acc_raw  = -acc_raw
+
+
         # ── LPF ─────────────────────────────
         self.gyro_f = lpf(self.gyro_f, gyro_raw, self.alpha_gyro)
         self.acc_f = lpf(self.acc_f, acc_raw, self.alpha_acc)

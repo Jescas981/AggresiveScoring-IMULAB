@@ -1,6 +1,6 @@
 import numpy as np
 from utils.mymath import skew, rotvec_to_quat, quat_mult, quat_to_rot
-GRAVITY = np.array([0, 0, 9.80665])
+GRAVITY = np.array([0, 0, -9.80665])
 
 class AttitudeEKF:
     def __init__(self):
@@ -84,7 +84,7 @@ class AttitudeEKF:
         a_norm = acc_corr / acc_mag               # unit gravity direction, body frame
 
         R      = quat_to_rot(self.q)
-        g_pred = R.T @ (GRAVITY / 9.81)     # expected unit gravity in body frame
+        g_pred = R.T @ (GRAVITY / 9.80665)     # expected unit gravity in body frame
 
         residual = a_norm - g_pred           # (3,)
 
@@ -135,11 +135,10 @@ class AttitudeEKF:
         # 1. Rotación body → world
         acc_corr = acc - self.ba
         R = quat_to_rot(self.q)
-        acc_world = R @ acc_corr
+        g_body = R.T @ GRAVITY
         # 2. Quitar gravedad
-        lin_acc = acc_world - GRAVITY
-
-        return lin_acc
+        lin_acc_body = acc_corr - g_body
+        return lin_acc_body 
 
     def acceleration(self, acc: np.ndarray):
         return acc - self.ba
