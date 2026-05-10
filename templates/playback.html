@@ -156,7 +156,7 @@ header {
 .chart-label { position: absolute; top: 6px; left: 10px; font-size: 8px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); pointer-events: none; z-index: 2; }
 .chart-legend { 
   position: absolute; top: 4px; right: 8px; display: flex; gap: 4px; 
-  z-index: 3; align-items: center; flex-wrap: wrap; max-width: 60%;
+  z-index: 3; align-items: center; flex-wrap: wrap; max-width: 70%;
   justify-content: flex-end;
 }
 
@@ -177,6 +177,9 @@ header {
   opacity: 0.35;
   line-height: 1.6;
   user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
 }
 .channel-toggle.active {
   opacity: 1;
@@ -184,6 +187,22 @@ header {
 }
 .channel-toggle:hover { opacity: 0.75; transform: scale(1.05); }
 .channel-toggle.active:hover { opacity: 0.85; }
+
+/* ── Live value readout inside legend button ── */
+.ch-label {
+  font-weight: 700;
+  letter-spacing: 0.8px;
+}
+.ch-val {
+  font-size: 8px;
+  font-weight: 400;
+  letter-spacing: 0;
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+  min-width: 52px;
+  text-align: left;
+}
 
 .window-info {
   position: absolute; bottom: 22px; right: 8px; font-size: 8px; color: var(--dim);
@@ -384,9 +403,7 @@ input[type=range].scrubber:disabled { opacity: .3; cursor: not-allowed; }
       <!-- Row 1: Accelerometer -->
       <div class="chart-row" id="row-accel">
         <div class="chart-label" id="lbl-accel">Accelerometer · m/s²</div>
-        <div class="chart-legend" id="legend-accel">
-          <!-- Populated by JS -->
-        </div>
+        <div class="chart-legend" id="legend-accel"></div>
         <div class="window-info" id="win-info-accel"></div>
         <canvas class="cv" id="cv-accel"></canvas>
       </div>
@@ -394,27 +411,21 @@ input[type=range].scrubber:disabled { opacity: .3; cursor: not-allowed; }
       <!-- Row 2: Gyroscope -->
       <div class="chart-row" id="row-gyro">
         <div class="chart-label" id="lbl-gyro">Gyroscope · rad/s</div>
-        <div class="chart-legend" id="legend-gyro">
-          <!-- Populated by JS -->
-        </div>
+        <div class="chart-legend" id="legend-gyro"></div>
         <canvas class="cv" id="cv-gyro"></canvas>
       </div>
 
       <!-- Row 3: Linear Acceleration -->
       <div class="chart-row" id="row-linacc" style="display:none;">
         <div class="chart-label">Linear Accel · m/s²</div>
-        <div class="chart-legend" id="legend-linacc">
-          <!-- Populated by JS -->
-        </div>
+        <div class="chart-legend" id="legend-linacc"></div>
         <canvas class="cv" id="cv-linacc"></canvas>
       </div>
 
       <!-- Row 4: Orientation -->
       <div class="chart-row" id="row-orient" style="display:none;">
         <div class="chart-label">Orientation · rad</div>
-        <div class="chart-legend" id="legend-orient">
-          <!-- Populated by JS -->
-        </div>
+        <div class="chart-legend" id="legend-orient"></div>
         <canvas class="cv" id="cv-orient"></canvas>
       </div>
 
@@ -470,7 +481,6 @@ const GYRO_COLORS   = ['#fbbf24','#a78bfa','#fb923c'];
 const LINACC_COLORS = ['#67e8f9','#4ade80','#e879f9'];
 const ORIENT_COLORS = ['#f59e0b','#38bdf8','#a78bfa'];
 
-// Channel label names per chart type
 const CHANNEL_NAMES = {
   accel:  ['X', 'Y', 'Z'],
   gyro:   ['X', 'Y', 'Z'],
@@ -499,7 +509,7 @@ function toggleChannel(chartName, idx) {
   if (btn) btn.classList.toggle('active', channelVisible[chartName][idx]);
 }
 
-// ── Build legend toggle buttons for a chart ────────────────────────────────
+// ── Build legend toggle buttons (now with live value span) ─────────────────
 function buildLegend(chartName) {
   const legend = document.getElementById(`legend-${chartName}`);
   if (!legend) return;
@@ -511,7 +521,8 @@ function buildLegend(chartName) {
     btn.id        = `ch-${chartName}-${i}`;
     btn.className = 'channel-toggle active';
     btn.style.color = colors[i];
-    btn.textContent = name;
+    // ── label + live value readout ──
+    btn.innerHTML = `<span class="ch-label">${name}</span><span class="ch-val" id="val-${chartName}-${i}"> —</span>`;
     btn.title = `Toggle ${name} channel`;
     btn.addEventListener('click', e => {
       e.stopPropagation();
@@ -536,6 +547,55 @@ function buildAllLegends() {
   buildLegend('linacc');
   buildLegend('orient');
   updateAutoscaleButtons();
+}
+
+// ── Interpolate a channel value at currentMs ───────────────────────────────
+function interpolateAtMs(ch, tsArr, ms) {
+  if (!ch || !ch.length || !tsArr || !tsArr.length) return null;
+  if (ms <= tsArr[0])  return ch[0];
+  if (ms >= tsArr[tsArr.length - 1]) return ch[ch.length - 1];
+  // binary search for bracket
+  let lo = 0, hi = tsArr.length - 1;
+  while (lo < hi) {
+    const m = (lo + hi + 1) >> 1;
+    tsArr[m] <= ms ? lo = m : hi = m - 1;
+  }
+  const t0 = tsArr[lo], t1 = tsArr[lo + 1];
+  if (t1 === undefined || t1 === t0) return ch[lo];
+  const alpha = (ms - t0) / (t1 - t0);
+  return ch[lo] + alpha * (ch[lo + 1] - ch[lo]);
+}
+
+// ── Format a value for display: sign + 3 decimals ─────────────────────────
+function fmtVal(v) {
+  if (v === null || v === undefined || !isFinite(v)) return ' —';
+  const abs = Math.abs(v);
+  // choose decimal places based on magnitude
+  const dec = abs < 0.01 ? 4 : abs < 10 ? 3 : abs < 100 ? 2 : 1;
+  const sign = v >= 0 ? '+' : '';
+  return ` ${sign}${v.toFixed(dec)}`;
+}
+
+// ── Update all legend value spans ─────────────────────────────────────────
+function updateAllChannelValues() {
+  const ts = imuSource === 'raw' ? timestamps : filtTimestamps;
+
+  const charts = imuSource === 'raw'
+    ? { accel: accelChans, gyro: gyroChans }
+    : { accel: filtAccelChans, gyro: filtGyroChans, linacc: filtLinAccChans, orient: filtOrientChans };
+
+  Object.entries(charts).forEach(([name, channels]) => {
+    channels.forEach((ch, i) => {
+      const el = document.getElementById(`val-${name}-${i}`);
+      if (!el) return;
+      if (!channelVisible[name][i]) {
+        el.textContent = '';
+        return;
+      }
+      const v = interpolateAtMs(ch, ts, currentMs);
+      el.textContent = fmtVal(v);
+    });
+  });
 }
 
 const colorMap = {};
@@ -638,7 +698,7 @@ function msToXMM(ms, W)    { return ((ms - minTs) / Math.max(maxTs - minTs, 1)) 
 function xToMsMM(x, W)     { return minTs + (x / W) * (maxTs - minTs); }
 function clamp(v, lo, hi)  { return Math.max(lo, Math.min(hi, v)); }
 
-// ── Compute scale from ALL data (respects visibility) ──────────────────────
+// ── Compute scale from ALL data ────────────────────────────────────────────
 function computeScale(channels, visible) {
   let mn = Infinity, mx = -Infinity;
   channels.forEach((ch, ci) => {
@@ -758,7 +818,7 @@ function mainLoop(t) {
 
     const frac = (currentMs - minTs) / (maxTs - minTs);
     document.getElementById('scrubber').value = Math.round(frac * 10000);
-    updateTimeDisplay();  
+    updateTimeDisplay();
 
     if (Math.abs(currentMs - _lastVideoSync) > 80) {
       syncGPSDisplay(); syncFrame(); _lastVideoSync = currentMs;
@@ -783,13 +843,16 @@ function mainLoop(t) {
     drawIMUChart(cvOrient, ctxO, filtOrientChans, scales.orient, ORIENT_COLORS,  filtTimestamps, channelVisible.orient);
   }
 
+  // ── Update live value readouts in legend ─────────────────────────────────
+  updateAllChannelValues();
+
   drawTrack();
   drawGPS();
   updateMinimapOverlay();
   _raf = requestAnimationFrame(mainLoop);
 }
 
-// ── Get scales (autoscale-aware, visibility-aware) ─────────────────────────
+// ── Get scales ─────────────────────────────────────────────────────────────
 function getScales() {
   if (imuSource === 'raw') {
     return {
@@ -818,8 +881,60 @@ function getScales() {
   }
 }
 
+// ── Draw Y-axis range labels ───────────────────────────────────────────────
+// Draws tick labels on the left edge for the given scale.
+// 5 ticks: max, 75%, mid, 25%, min. Skips if too close to edges.
+function drawYAxis(ctx, W, PH, scale) {
+  if (!scale) return;
+  const { mn, mx } = scale;
+  const rng = mx - mn || 1;
+  const sY  = PH / rng;
+
+  ctx.font = "8px 'Azeret Mono'";
+  ctx.textBaseline = 'middle';
+
+  // pick nice tick values spanning the range
+  const tickCount = 5;
+  for (let i = 0; i <= tickCount; i++) {
+    const v  = mn + rng * i / tickCount;
+    const y  = PH - (v - mn) * sY;
+    if (y < 6 || y > PH - 6) continue;  // skip if too close to border
+
+    const label = Math.abs(v) < 0.001 ? '0'
+                : Math.abs(v) < 10    ? v.toFixed(2)
+                : Math.abs(v) < 100   ? v.toFixed(1)
+                : v.toFixed(0);
+    const tw = ctx.measureText(label).width;
+
+    // pill background
+    ctx.fillStyle = 'rgba(6,8,16,0.82)';
+    ctx.fillRect(3, y - 6, tw + 6, 12);
+
+    // tick mark
+    ctx.strokeStyle = '#1d2a3d';
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.moveTo(0,  y);
+    ctx.lineTo(tw + 12, y);
+    ctx.stroke();
+
+    // label text
+    ctx.fillStyle = '#4a607e';
+    ctx.fillText(label, 5, y);
+  }
+
+  // Also draw min/max range badge at bottom-left corner
+  const rangeLabel = `[${mn.toFixed(1)}, ${mx.toFixed(1)}]`;
+  const rw = ctx.measureText(rangeLabel).width;
+  ctx.fillStyle = 'rgba(6,8,16,0.72)';
+  ctx.fillRect(2, PH - 20, rw + 8, 13);
+  ctx.fillStyle = '#2d3f58';
+  ctx.fillText(rangeLabel, 5, PH - 14);
+
+  ctx.textBaseline = 'alphabetic'; // reset
+}
+
 // ── Draw IMU chart ─────────────────────────────────────────────────────────
-// `visible` is bool[3] — skip drawing a channel if its flag is false
 function drawIMUChart(cv, ctx, channels, scale, colors, tsArr, visible) {
   const W = cv.width, H = cv.height;
   if (!W || !H) return;
@@ -885,7 +1000,7 @@ function drawIMUChart(cv, ctx, channels, scale, colors, tsArr, visible) {
     ctx.stroke(); ctx.setLineDash([]);
   }
 
-  // Signal lines — skip hidden channels
+  // Signal lines
   if (scale && tsArr.length >= 2) {
     const { mn, mx } = scale;
     const rng = mx - mn || 1, sY = PH / rng;
@@ -897,7 +1012,6 @@ function drawIMUChart(cv, ctx, channels, scale, colors, tsArr, visible) {
     const iStart = Math.max(0, lo-1);
 
     channels.forEach((data, ci) => {
-      // ─── VISIBILITY CHECK ───
       if (visible && !visible[ci]) return;
       if (!data.length) return;
 
@@ -912,6 +1026,25 @@ function drawIMUChart(cv, ctx, channels, scale, colors, tsArr, visible) {
       }
       ctx.stroke();
     });
+
+    // ── Draw cursor dot per visible channel ───────────────────────────────
+    const cx = msToX(currentMs, W);
+    if (cx >= 0 && cx <= W) {
+      channels.forEach((data, ci) => {
+        if (visible && !visible[ci]) return;
+        if (!data.length) return;
+        const v = interpolateAtMs(data, tsArr, currentMs);
+        if (v === null) return;
+        const cy = PH - (v - mn) * sY;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle   = colors[ci];
+        ctx.strokeStyle = 'rgba(6,8,16,0.8)';
+        ctx.lineWidth   = 1.5;
+        ctx.fill();
+        ctx.stroke();
+      });
+    }
   }
 
   // Zero line
@@ -925,7 +1058,10 @@ function drawIMUChart(cv, ctx, channels, scale, colors, tsArr, visible) {
     }
   }
 
-  // Cursor
+  // ── Y-axis range labels ────────────────────────────────────────────────
+  drawYAxis(ctx, W, PH, scale);
+
+  // Cursor line + triangle
   const cx = msToX(currentMs, W);
   if (cx >= 0 && cx <= W) {
     const grad = ctx.createLinearGradient(cx-8,0,cx+8,0);
@@ -1113,7 +1249,7 @@ function syncFrame() {
     frameTs[m].timestamp_ms <= currentMs ? lo = m : hi = m - 1;
   }
   const idx = frameTs[lo].frame_idx;
-  
+
   if (idx === lastShownFrame) return;
   lastShownFrame = idx;
 
@@ -1127,6 +1263,7 @@ function syncFrame() {
     document.getElementById('vid-nosig').style.display = 'flex';
   }
 }
+
 // ── Seek ───────────────────────────────────────────────────────────────────
 function seekTo(ms) {
   currentMs = clamp(ms, minTs, maxTs);
@@ -1415,11 +1552,9 @@ async function loadSession(s, el) {
   el.classList.add('active');
   document.getElementById('loading').classList.add('show');
 
-  // Reset autoscale & visibility
   autoScaleChart = { accel: false, gyro: false, linacc: false, orient: false };
   ['accel','gyro','linacc','orient'].forEach(name => {
     channelVisible[name] = [true, true, true];
-    // Reset button states
     for (let i = 0; i < 3; i++) {
       const btn = document.getElementById(`ch-${name}-${i}`);
       if (btn) btn.classList.add('active');
@@ -1532,7 +1667,7 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Init ───────────────────────────────────────────────────────────────────
-buildAllLegends(); // Build toggle buttons immediately
+buildAllLegends();
 resize();
 _raf = requestAnimationFrame(mainLoop);
 loadSessions();

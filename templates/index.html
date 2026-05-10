@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>IMU + GPS · Recorder & Monitor</title>
+  <!-- fonts remain but labels/playback removed -->
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0c0f;
+      --surface: #111419;
+      --surface2: #181c23;
+      --border: #232830;
+      --accent: #00e5ff;
+      --red: #ff3b5c;
+      --green: #00ff8c;
+      --yellow: #ffcc00;
+      --purple: #bb86fc;
+      --orange: #ff7043;
+      --muted: #4a5568;
+      --text: #e2e8f0;
+      --text-dim: #718096;
+      --gps: #34d399;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'Syne', sans-serif;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      overflow: hidden;
+    }
+
+    /* header */
+    header {
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--surface);
+    }
+    header h1 {
+      font-family: var(--sans);
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--accent);
+    }
+    .sub {
+      font-size: 9px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    .header-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+    .dot.active {
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+    }
+    .dot.recording {
+      background: var(--red);
+      box-shadow: 0 0 8px var(--red);
+    }
+    .gps-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      padding: 3px 8px;
+      border: 1px solid #34d39933;
+      background: #34d3990a;
+      color: var(--gps);
+    }
+    .gps-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+    .gps-dot.fix {
+      background: var(--gps);
+      box-shadow: 0 0 6px var(--gps);
+    }
+
+    /* mode bar – only live & packets remain */
+    .mode-bar {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      padding: 0 20px;
+      gap: 0;
+    }
+    .mode-tab {
+      padding: 9px 18px;
+      font-size: 10px;
+      font-family: var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+    }
+    .mode-tab:hover {
+      color: var(--text);
+    }
+    .mode-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    /* main layout: two columns with panels */
+    main {
+      display: grid;
+      height: calc(100vh - 84px);
+      overflow: hidden;
+      grid-template-columns: 280px 1fr 260px;
+    }
+    .panel {
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel:last-child {
+      border-right: none;
+    }
+    .panel-header {
+      padding: 8px 14px;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 2.5px;
+      color: var(--text-dim);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* left: controls + packet feed */
+    #left-panel {
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+    }
+    .ctrl-section {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      margin-bottom: 3px;
+    }
+    .btn {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn:hover {
+      background: var(--border);
+    }
+    .btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+    .btn-rec {
+      color: var(--red);
+      border-color: #ff3b5c33;
+    }
+    .file-path {
+      font-size: 9px;
+      color: var(--text-dim);
+      word-break: break-all;
+      padding: 8px 12px;
+      background: #0a0c0f;
+      border-top: 1px solid var(--border);
+      line-height: 1.6;
+    }
+    .file-path span {
+      color: var(--green);
+    }
+    .file-path .gps-file {
+      color: var(--gps);
+    }
+
+    /* packet feed inside left panel */
+    .pkt-feed-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-top: 1px solid var(--border);
+    }
+    .pkt-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .pkt-tab {
+      flex: 1;
+      padding: 6px;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      cursor: pointer;
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .pkt-tab.active.imu {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .pkt-tab.active.gps {
+      color: var(--gps);
+      border-bottom-color: var(--gps);
+    }
+    .pkt-stats {
+      padding: 6px 12px;
+      font-size: 9px;
+      display: flex;
+      justify-content: space-between;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+    .pkt-hdr-imu, .pkt-hdr-gps {
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 4px 8px;
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      gap: 4px;
+      background: var(--surface);
+      color: var(--text-dim);
+    }
+    .pkt-hdr-imu { grid-template-columns: 50px repeat(6, 1fr); }
+    .pkt-hdr-gps { grid-template-columns: 50px repeat(5, 1fr); }
+    .pkt-feed {
+      flex: 1;
+      overflow-y: auto;
+      font-size: 9px;
+      background: #0a0c0f;
+    }
+    .pkt-row-imu, .pkt-row-gps {
+      padding: 2px 8px;
+      border-bottom: 1px solid #ffffff06;
+      display: grid;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .pkt-row-imu { grid-template-columns: 50px repeat(6, 1fr); }
+    .pkt-row-gps { grid-template-columns: 50px repeat(5, 1fr); }
+    .ts { color: var(--muted); }
+    .pkt-ax { color: #00e5ff; } .pkt-ay { color: #00ff8c; } .pkt-az { color: #ff3b5c; }
+    .pkt-gx { color: #ffcc00; } .pkt-gy { color: #bb86fc; } .pkt-gz { color: #ff7043; }
+    .pkt-lat { color: #34d399; } .pkt-lon { color: #6ee7b7; }
+    .pkt-spd { color: #fcd34d; } .pkt-crs { color: #a78bfa; } .pkt-alt { color: #67e8f9; }
+
+    /* center: charts + live strip */
+    #center-panel {
+      display: flex;
+      flex-direction: column;
+      background: #0a0c0f;
+    }
+    .charts-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .chart-row {
+      flex: 1;
+      position: relative;
+      border-bottom: 1px solid var(--border);
+    }
+    .chart-title {
+      position: absolute;
+      top: 5px;
+      left: 8px;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      z-index: 2;
+      pointer-events: none;
+    }
+    canvas.chart-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .live-strip {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .live-val {
+      padding: 6px;
+      border-right: 1px solid var(--border);
+      font-size: 9px;
+    }
+    .live-val:last-child { border-right: none; }
+    .lv-name { color: var(--text-dim); text-transform: uppercase; margin-bottom: 2px; }
+    .lv-num { font-size: 10px; font-weight: 600; }
+
+    /* right: GPS + camera */
+    #gps-panel {
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+    }
+    .gps-map {
+      flex: 1;
+      background: #0d1117;
+      position: relative;
+      overflow: hidden;
+    }
+    #gps-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .gps-no-fix {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: var(--muted);
+      font-size: 10px;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    .cam-view {
+      height: 160px;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-top: 1px solid var(--border);
+      position: relative;
+    }
+    .cam-view img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .cam-no-signal {
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+    .gps-data-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-top: 1px solid var(--border);
+    }
+    .gps-cell {
+      padding: 7px 10px;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      font-size: 9px;
+    }
+    .gps-cell:nth-child(2n) { border-right: none; }
+    .gc-name { color: var(--text-dim); text-transform: uppercase; margin-bottom: 2px; }
+    .gc-val { font-size: 11px; font-weight: 600; color: var(--gps); }
+    .gc-val.no-fix { color: var(--muted); }
+
+    /* console (compact) */
+    .console-wrap {
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      max-height: 110px;
+      display: flex;
+      flex-direction: column;
+    }
+    .console-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 8px;
+      font-size: 9px;
+    }
+    .con-row { display: flex; gap: 6px; }
+    .con-ts { color: var(--muted); }
+    .con-info { color: var(--green); }
+    .con-warn { color: var(--yellow); }
+    .con-error { color: var(--red); }
+  </style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>⬡ IMU + GPS RECORDER</h1>
+    <div class="sub">live monitor · no labels</div>
+  </div>
+  <div class="header-right">
+    <div class="gps-pill">
+      <div class="gps-dot" id="gps-dot"></div>
+      <span id="gps-status-text">NO FIX</span>
+    </div>
+    <div class="status-pill">
+      <div class="dot" id="dot"></div>
+      <span id="status-text">IDLE</span>
+    </div>
+  </div>
+</header>
+
+<div class="mode-bar">
+  <button class="mode-tab active" id="tab-live" onclick="setMode('live')">⏺ Live</button>
+  <button class="mode-tab" id="tab-packets" onclick="setMode('packets')">⬡ Packets</button>
+</div>
+
+<main id="main">
+  <!-- LEFT: controls + packet feed -->
+  <aside class="panel" id="left-panel">
+    <div class="ctrl-section">
+      <div class="section-label">Recording</div>
+      <button class="btn btn-rec" id="btn-record" onclick="startRecording()">⏺ Start Recording</button>
+      <button class="btn" id="btn-stop" onclick="stopRecording()" disabled>⏹ Stop Recording</button>
+      <div style="margin-top: 6px;">
+        <div class="stat-row" style="display: flex; justify-content: space-between; font-size:10px;">
+          <span>IMU packets</span><span class="stat-val green" id="stat-packets">0</span>
+        </div>
+        <div class="stat-row" style="display: flex; justify-content: space-between; font-size:10px;">
+          <span>GPS fixes</span><span class="stat-val gps" id="stat-gps-pkts">0</span>
+        </div>
+        <div class="stat-row" style="display: flex; justify-content: space-between; font-size:10px;">
+          <span>Session</span><span id="stat-session" style="color:var(--text-dim);">—</span>
+        </div>
+      </div>
+    </div>
+    <div class="file-path" id="file-path">No active file</div>
+
+    <!-- packet feed (shared) -->
+    <div class="pkt-feed-wrap">
+      <div class="pkt-tabs">
+        <button class="pkt-tab active imu" id="pkttab-imu" onclick="setPktTab('imu')">⬡ IMU</button>
+        <button class="pkt-tab gps" id="pkttab-gps" onclick="setPktTab('gps')">◎ GPS</button>
+      </div>
+      <div class="pkt-stats">
+        <span>IMU: <span id="pkt-total-imu">0</span></span>
+        <span>GPS: <span id="pkt-total-gps">0</span></span>
+        <span id="pkt-rate">— Hz</span>
+      </div>
+      <div id="pkt-imu-section" style="display: flex; flex-direction: column; flex:1; overflow:hidden;">
+        <div class="pkt-hdr-imu"><span>ms</span><span class="pkt-ax">Ax</span><span class="pkt-ay">Ay</span><span class="pkt-az">Az</span><span class="pkt-gx">Gx</span><span class="pkt-gy">Gy</span><span class="pkt-gz">Gz</span></div>
+        <div class="pkt-feed" id="pkt-feed-imu"></div>
+      </div>
+      <div id="pkt-gps-section" style="display: none; flex-direction: column; flex:1; overflow:hidden;">
+        <div class="pkt-hdr-gps"><span>ms</span><span class="pkt-lat">Lat</span><span class="pkt-lon">Lon</span><span class="pkt-spd">Spd</span><span class="pkt-crs">Crs</span><span class="pkt-alt">Alt</span></div>
+        <div class="pkt-feed" id="pkt-feed-gps"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CENTER: IMU charts -->
+  <section class="panel" id="center-panel">
+    <div class="panel-header">IMU Signal</div>
+    <div class="charts-area">
+      <div class="chart-row"><div class="chart-title">Accelerometer m/s²</div><canvas id="canvas-accel" class="chart-canvas"></canvas></div>
+      <div class="chart-row"><div class="chart-title">Gyroscope rad/s</div><canvas id="canvas-gyro" class="chart-canvas"></canvas></div>
+    </div>
+    <div class="live-strip">
+      <div class="live-val"><div class="lv-name">Ax</div><div class="lv-num pkt-ax" id="lv-ax">—</div></div>
+      <div class="live-val"><div class="lv-name">Ay</div><div class="lv-num pkt-ay" id="lv-ay">—</div></div>
+      <div class="live-val"><div class="lv-name">Az</div><div class="lv-num pkt-az" id="lv-az">—</div></div>
+      <div class="live-val"><div class="lv-name">Gx</div><div class="lv-num pkt-gx" id="lv-gx">—</div></div>
+      <div class="live-val"><div class="lv-name">Gy</div><div class="lv-num pkt-gy" id="lv-gy">—</div></div>
+      <div class="live-val"><div class="lv-name">Gz</div><div class="lv-num pkt-gz" id="lv-gz">—</div></div>
+    </div>
+  </section>
+
+  <!-- RIGHT: GPS + camera + console -->
+  <section class="panel" id="gps-panel">
+    <div class="panel-header">GPS <span id="gps-fix-badge" style="color:var(--muted);">NO FIX</span></div>
+    <div class="gps-map">
+      <canvas id="gps-canvas"></canvas>
+      <div class="gps-no-fix" id="gps-no-fix">Waiting for fix…</div>
+    </div>
+    <div class="cam-view" id="cam-view">
+      <div class="cam-no-signal" id="cam-no-signal">No signal</div>
+      <img id="cam-img" src="" style="display:none;" alt="camera" />
+    </div>
+    <div class="gps-data-grid">
+      <div class="gps-cell"><div class="gc-name">Latitude</div><div class="gc-val no-fix" id="gv-lat">—</div></div>
+      <div class="gps-cell"><div class="gc-name">Longitude</div><div class="gc-val no-fix" id="gv-lon">—</div></div>
+      <div class="gps-cell"><div class="gc-name">Speed m/s</div><div class="gc-val no-fix" id="gv-spd">—</div></div>
+      <div class="gps-cell"><div class="gc-name">Course °</div><div class="gc-val no-fix" id="gv-crs">—</div></div>
+      <div class="gps-cell"><div class="gc-name">Altitude m</div><div class="gc-val no-fix" id="gv-alt">—</div></div>
+      <div class="gps-cell"><div class="gc-name">UTC</div><div class="gc-val no-fix" id="gv-utc">—</div></div>
+    </div>
+    <div class="console-wrap">
+      <div class="panel-header" style="font-size:9px;">MQTT Console <span id="con-count"></span></div>
+      <div class="console-list" id="console-list"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+  const API = "http://localhost:5000";
+  const TYPE_IMU = 1, TYPE_GPS = 2;
+
+  // chart buffers
+  const N = 400;
+  const aX = new Float32Array(N), aY = new Float32Array(N), aZ = new Float32Array(N);
+  const gX = new Float32Array(N), gY = new Float32Array(N), gZ = new Float32Array(N);
+  const tsBuf = new Float64Array(N);
+  let bufLen = 0, bufHead = 0;
+
+  function pushSample(ax, ay, az, gxx, gy, gz, ts) {
+    aX[bufHead] = ax; aY[bufHead] = ay; aZ[bufHead] = az;
+    gX[bufHead] = gxx; gY[bufHead] = gy; gZ[bufHead] = gz;
+    tsBuf[bufHead] = ts;
+    bufHead = (bufHead + 1) % N;
+    if (bufLen < N) bufLen++;
+  }
+
+  // GPS trail
+  const gpsTrail = [];
+  let gpsHasFix = false;
+
+  function pushGPSPoint(lat, lon) {
+    gpsTrail.push({ lat, lon });
+    if (gpsTrail.length > 2000) gpsTrail.shift();
+  }
+
+  // canvases
+  const cA = { canvas: document.getElementById('canvas-accel') };
+  const cG = { canvas: document.getElementById('canvas-gyro') };
+  cA.ctx = cA.canvas.getContext('2d');
+  cG.ctx = cG.canvas.getContext('2d');
+  const gpsCanvas = document.getElementById('gps-canvas');
+  const gpsCtx = gpsCanvas.getContext('2d');
+
+  function resizeCanvases() {
+    [cA, cG].forEach(c => {
+      c.canvas.width = c.canvas.parentElement.clientWidth;
+      c.canvas.height = c.canvas.parentElement.clientHeight;
+    });
+    const mapEl = document.querySelector('.gps-map');
+    if (mapEl) {
+      gpsCanvas.width = mapEl.clientWidth;
+      gpsCanvas.height = mapEl.clientHeight;
+    }
+  }
+  window.addEventListener('resize', resizeCanvases);
+  resizeCanvases();
+
+  // app mode
+  let appMode = 'live';
+  let pktTab = 'imu';
+
+  function setMode(mode) {
+    appMode = mode;
+    document.getElementById('tab-live').classList.toggle('active', mode === 'live');
+    document.getElementById('tab-packets').classList.toggle('active', mode === 'packets');
+  }
+
+  function setPktTab(tab) {
+    pktTab = tab;
+    document.getElementById('pkttab-imu').classList.toggle('active', tab === 'imu');
+    document.getElementById('pkttab-gps').classList.toggle('active', tab === 'gps');
+    document.getElementById('pkt-imu-section').style.display = tab === 'imu' ? 'flex' : 'none';
+    document.getElementById('pkt-gps-section').style.display = tab === 'gps' ? 'flex' : 'none';
+  }
+
+  // state
+  let isRecording = false;
+  let lastSeq = -1, lastTs = -1;
+  let imuPktCount = 0, gpsPktCount = 0;
+  let rateCount = 0, rateTs = Date.now();
+
+  async function pollStatus() {
+    try {
+      const res = await fetch(`${API}/status`).then(r => r.json());
+      isRecording = res.receiving;
+      const dot = document.getElementById('dot');
+      const stxt = document.getElementById('status-text');
+      dot.className = 'dot';
+      if (isRecording) {
+        dot.classList.add('recording');
+        stxt.textContent = 'RECORDING';
+      } else {
+        stxt.textContent = 'IDLE';
+      }
+      document.getElementById('btn-record').disabled = isRecording;
+      document.getElementById('btn-stop').disabled = !isRecording;
+
+      document.getElementById('stat-packets').textContent = res.packet_count || 0;
+      document.getElementById('stat-session').textContent = res.last_packet?.session_id || '—';
+
+      const fp = document.getElementById('file-path');
+      if (res.imu_csv_path) {
+        fp.innerHTML = `IMU → <span>${res.imu_csv_path}</span><br>GPS → <span class="gps-file">${res.gps_csv_path || 'pending'}</span>`;
+      } else {
+        fp.innerHTML = 'No active file';
+      }
+
+      if (res.last_packet && res.last_packet.type === TYPE_IMU) {
+        const p = res.last_packet;
+        document.getElementById('lv-ax').textContent = p.accel_x?.toFixed(2) || '—';
+        document.getElementById('lv-ay').textContent = p.accel_y?.toFixed(2) || '—';
+        document.getElementById('lv-az').textContent = p.accel_z?.toFixed(2) || '—';
+        document.getElementById('lv-gx').textContent = p.gyro_x?.toFixed(2) || '—';
+        document.getElementById('lv-gy').textContent = p.gyro_y?.toFixed(2) || '—';
+        document.getElementById('lv-gz').textContent = p.gyro_z?.toFixed(2) || '—';
+      }
+
+      const camImg = document.getElementById('cam-img');
+      const noSig = document.getElementById('cam-no-signal');
+      camImg.src = `${API}/video_feed`;
+      camImg.style.display = 'block';
+      noSig.style.display = 'none';
+    } catch (e) {}
+  }
+
+  async function pollPackets() {
+    try {
+      const data = await fetch(`${API}/packets?since=${lastSeq}`).then(r => r.json());
+      if (!data.length) return;
+      lastSeq = data[data.length - 1]._seq;
+
+      const imuPkts = data.filter(p => p.type === TYPE_IMU);
+      const gpsPkts = data.filter(p => p.type === TYPE_GPS);
+
+      imuPktCount += imuPkts.length;
+      gpsPktCount += gpsPkts.length;
+      rateCount += imuPkts.length;
+
+      imuPkts.forEach(p => {
+        if (p.timestamp_ms !== lastTs) {
+          lastTs = p.timestamp_ms;
+          pushSample(p.accel_x, p.accel_y, p.accel_z, p.gyro_x, p.gyro_y, p.gyro_z, p.timestamp_ms);
+        }
+      });
+
+      if (gpsPkts.length > 0) {
+        const latest = gpsPkts[gpsPkts.length - 1];
+        updateGPSDisplay(latest);
+        document.getElementById('stat-gps-pkts').textContent = gpsPktCount;
+      }
+
+      // packet feed
+      const feedImu = document.getElementById('pkt-feed-imu');
+      imuPkts.slice().reverse().forEach(p => {
+        const row = document.createElement('div');
+        row.className = 'pkt-row-imu';
+        row.innerHTML = `<span class="ts">${p.timestamp_ms}</span><span class="pkt-ax">${p.accel_x?.toFixed(2)}</span><span class="pkt-ay">${p.accel_y?.toFixed(2)}</span><span class="pkt-az">${p.accel_z?.toFixed(2)}</span><span class="pkt-gx">${p.gyro_x?.toFixed(3)}</span><span class="pkt-gy">${p.gyro_y?.toFixed(3)}</span><span class="pkt-gz">${p.gyro_z?.toFixed(3)}</span>`;
+        feedImu.prepend(row);
+      });
+      while (feedImu.children.length > 400) feedImu.lastChild.remove();
+
+      const feedGps = document.getElementById('pkt-feed-gps');
+      gpsPkts.slice().reverse().forEach(p => {
+        const row = document.createElement('div');
+        row.className = 'pkt-row-gps';
+        row.innerHTML = `<span class="ts">${p.timestamp_ms}</span><span class="pkt-lat">${p.latitude?.toFixed(5)}</span><span class="pkt-lon">${p.longitude?.toFixed(5)}</span><span class="pkt-spd">${p.speed_mps?.toFixed(2)}</span><span class="pkt-crs">${p.course_deg?.toFixed(1)}</span><span class="pkt-alt">${p.altitude_m?.toFixed(1)}</span>`;
+        feedGps.prepend(row);
+      });
+      while (feedGps.children.length > 400) feedGps.lastChild.remove();
+
+      document.getElementById('pkt-total-imu').textContent = imuPktCount;
+      document.getElementById('pkt-total-gps').textContent = gpsPktCount;
+    } catch (e) {}
+
+    const now = Date.now();
+    if (now - rateTs >= 1000) {
+      const hz = (rateCount / (now - rateTs) * 1000).toFixed(1);
+      document.getElementById('pkt-rate').textContent = `${hz} Hz`;
+      rateCount = 0;
+      rateTs = now;
+    }
+  }
+
+  function updateGPSDisplay(p) {
+    gpsHasFix = true;
+    document.getElementById('gps-no-fix').style.display = 'none';
+    document.getElementById('gps-dot').classList.add('fix');
+    document.getElementById('gps-status-text').textContent = 'FIX';
+    document.getElementById('gps-fix-badge').textContent = 'ACTIVE';
+    document.getElementById('gps-fix-badge').style.color = 'var(--gps)';
+
+    document.getElementById('gv-lat').textContent = p.latitude.toFixed(6);
+    document.getElementById('gv-lon').textContent = p.longitude.toFixed(6);
+    document.getElementById('gv-spd').textContent = p.speed_mps.toFixed(2);
+    document.getElementById('gv-crs').textContent = p.course_deg.toFixed(1);
+    document.getElementById('gv-alt').textContent = p.altitude_m.toFixed(1);
+    const utc = p.utc_seconds || 0;
+    const h = Math.floor(utc/3600), m = Math.floor((utc%3600)/60), s = Math.floor(utc%60);
+    document.getElementById('gv-utc').textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    ['gv-lat','gv-lon','gv-spd','gv-crs','gv-alt','gv-utc'].forEach(id => document.getElementById(id).classList.remove('no-fix'));
+
+    pushGPSPoint(p.latitude, p.longitude);
+  }
+
+  // chart drawing (no label overlays)
+  function drawCharts() {
+    if (bufLen === 0) return;
+    drawOne(cA, aX, aY, aZ, ["#00e5ff","#00ff8c","#ff3b5c"]);
+    drawOne(cG, gX, gY, gZ, ["#ffcc00","#bb86fc","#ff7043"]);
+  }
+
+  function getViewRange() {
+    if (bufLen === 0) return { viewStart: 0, span: 1 };
+    const oldest = bufLen < N ? 0 : bufHead;
+    const newest = bufLen < N ? bufLen-1 : (bufHead+N-1)%N;
+    return { viewStart: tsBuf[oldest], span: Math.max(tsBuf[newest]-tsBuf[oldest],1) };
+  }
+
+  function drawOne({canvas, ctx}, dA, dB, dC, colors) {
+    const W = canvas.width, H = canvas.height, PH = H-20;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle="#0a0c0f"; ctx.fillRect(0,0,W,H);
+    const {viewStart, span} = getViewRange();
+    const toX = ms => ((ms-viewStart)/span)*W;
+
+    const {mn,mx} = (()=>{
+      let mn=Infinity,mx=-Infinity;
+      for(let i=0;i<bufLen;i++){mn=Math.min(mn,dA[i],dB[i],dC[i]);mx=Math.max(mx,dA[i],dB[i],dC[i]);}
+      return {mn,mx};
+    })();
+    if(mn===Infinity) return;
+    const rng = mx-mn||1, pad=rng*.15, scale = PH/(rng+2*pad), base = mn-pad;
+    const n = bufLen<N ? bufLen : N;
+
+    function drawSignal(data, stroke, w) {
+      ctx.strokeStyle=stroke; ctx.lineWidth=w; ctx.beginPath();
+      let pen=false;
+      for(let i=0;i<n;i++){
+        const idx=bufLen<N?i:(bufHead+i)%N;
+        const x=toX(tsBuf[idx]), y=PH-(data[idx]-base)*scale;
+        if(!pen){ctx.moveTo(x,y);pen=true;}else{ctx.lineTo(x,y);}
+      }
+      ctx.stroke();
+    }
+    [dA,dB,dC].forEach((data,i)=>{ drawSignal(data,colors[i]+'40',4); drawSignal(data,colors[i],1.5); });
+    ctx.fillStyle="#0a0c0f"; ctx.fillRect(0,PH,W,20);
+  }
+
+  function drawGPSTrail() {
+    const W = gpsCanvas.width, H = gpsCanvas.height;
+    gpsCtx.clearRect(0,0,W,H);
+    gpsCtx.fillStyle="#0d1117"; gpsCtx.fillRect(0,0,W,H);
+    if(gpsTrail.length<2) return;
+
+    let minLat=Infinity,maxLat=-Infinity,minLon=Infinity,maxLon=-Infinity;
+    gpsTrail.forEach(p=>{minLat=Math.min(minLat,p.lat);maxLat=Math.max(maxLat,p.lat);minLon=Math.min(minLon,p.lon);maxLon=Math.max(maxLon,p.lon);});
+    const pad=0.15, latSpan=Math.max(maxLat-minLat,0.0001), lonSpan=Math.max(maxLon-minLon,0.0001);
+    const toX=lon=>pad*W+((lon-minLon)/lonSpan)*(1-2*pad)*W;
+    const toY=lat=>H-(pad*H+((lat-minLat)/latSpan)*(1-2*pad)*H);
+
+    gpsCtx.beginPath(); gpsTrail.forEach((p,i)=>i===0?gpsCtx.moveTo(toX(p.lon),toY(p.lat)):gpsCtx.lineTo(toX(p.lon),toY(p.lat)));
+    gpsCtx.strokeStyle="#34d39930"; gpsCtx.lineWidth=6; gpsCtx.stroke();
+    gpsCtx.beginPath(); gpsTrail.forEach((p,i)=>i===0?gpsCtx.moveTo(toX(p.lon),toY(p.lat)):gpsCtx.lineTo(toX(p.lon),toY(p.lat)));
+    gpsCtx.strokeStyle="#34d399"; gpsCtx.lineWidth=1.5; gpsCtx.stroke();
+    const last=gpsTrail[gpsTrail.length-1];
+    gpsCtx.beginPath(); gpsCtx.arc(toX(last.lon),toY(last.lat),5,0,2*Math.PI); gpsCtx.fillStyle="#34d399"; gpsCtx.fill();
+  }
+
+  function renderLoop() {
+    drawCharts();
+    drawGPSTrail();
+    requestAnimationFrame(renderLoop);
+  }
+  renderLoop();
+
+  // events console
+  let eventCount = 0;
+  async function pollEvents() {
+    try {
+      const evts = await fetch(`${API}/events`).then(r=>r.json());
+      if (evts.length === eventCount) return;
+      const list = document.getElementById('console-list');
+      evts.slice(eventCount).forEach(e => {
+        const row = document.createElement('div'); row.className = 'con-row';
+        const d = new Date(e.ts);
+        const ts = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+        row.innerHTML = `<span class="con-ts">${ts}</span><span class="con-${e.level}">${e.msg}</span>`;
+        list.appendChild(row);
+      });
+      list.scrollTop = list.scrollHeight;
+      eventCount = evts.length;
+      document.getElementById('con-count').textContent = `(${evts.length})`;
+    } catch(e) {}
+  }
+
+  async function startRecording() {
+    bufLen=0; bufHead=0; lastTs=-1; lastSeq=-1; imuPktCount=0; gpsPktCount=0; gpsTrail.length=0; gpsHasFix=false;
+    document.getElementById('gps-dot').classList.remove('fix');
+    document.getElementById('gps-status-text').textContent='NO FIX';
+    await fetch(`${API}/start_recording`, {method:'POST'});
+  }
+  async function stopRecording() {
+    await fetch(`${API}/stop_recording`, {method:'POST'});
+  }
+
+  setInterval(pollStatus, 200);
+  setInterval(pollPackets, 120);
+  setInterval(pollEvents, 600);
+  pollStatus();
+</script>
+</body>
+</html>
