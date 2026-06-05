@@ -1,3 +1,9 @@
-/data
+/Viewer/data
+/Embeed/model_cc
+/Embeed/model_input
+/Embeed/include/model_cc
+/Embeed/include/model_interface.h
+/Embeed/mosquitto
+
 **/.vscode/
 __pycache__/
