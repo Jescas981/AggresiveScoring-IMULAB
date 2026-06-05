@@ -15,5 +15,8 @@ A powerful web-based visualization and labeling tool for Inertial Measurement Un
 
 IMU Lab is a browser-based tool designed for exploring, visualizing, and annotating IMU sensor data from vehicle telemetry recordings. It provides a rich interface for analyzing accelerometer, gyroscope, and filtered orientation data alongside GPS trajectories and synchronized video frames, making it ideal for autonomous driving data analysis and driving event labeling.
 
-# Dataset download
+## Dataset download
+Link will be available soon ...
+
+## Paper link and reference
 Link will be available soon ...
