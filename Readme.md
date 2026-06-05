@@ -8,7 +8,7 @@ Code is ready to be uplodad on microcontroller
 
 A powerful web-based visualization and labeling tool for Inertial Measurement Unit (IMU) data, featuring synchronized multi-axis signal charts, GPS trail visualization, video frame playback, and an intuitive labeling system for driving event annotation.
 
-![IMU Lab Interface](IMULAB/docs/preview.png)
+![IMU Lab Interface](IMULAB/docs/preview.gif)
 
 
 ### 🎯 Overview
