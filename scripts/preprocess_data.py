@@ -26,8 +26,9 @@ DATA_ROOT = os.path.join(ROOT, "data")
 
 sessions = sorted([
     d for d in os.listdir(DATA_ROOT)
-    if d.startswith("session_")
 ])
+
+print(f"Found {len(sessions)} sessions:")
 
 global_bar = ProgressBar(len(sessions), label="ALL SESSIONS")
 
@@ -37,6 +38,8 @@ global_bar = ProgressBar(len(sessions), label="ALL SESSIONS")
 # ─────────────────────────────
 
 for session in sessions:
+
+    print(f"\n🔍 Checking {session}...")
 
     DATA_DIR = os.path.join(DATA_ROOT, session)
 
@@ -88,10 +91,10 @@ for session in sessions:
 
     imu_with_gps = pd.merge_asof(
         imu.sort_values("timestamp_ms"),
-        gps[["timestamp_ms", "speed_mps", "course_deg"]],
+        gps[["timestamp_ms", "speed_mps", "course_deg","latitude","longitude","altitude_m"]],
         on="timestamp_ms",
         direction="nearest",
-        tolerance=200
+        tolerance=30
     )
 
     imu_with_gps.to_csv(

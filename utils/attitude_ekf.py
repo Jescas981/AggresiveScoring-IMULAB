@@ -1,6 +1,8 @@
 import numpy as np
 from utils.mymath import skew, rotvec_to_quat, quat_mult, quat_to_rot
-GRAVITY = np.array([0, 0, -9.80665])
+
+GRAVITY_MAG = 9.80665
+GRAVITY_VEC = np.array([0, 0, GRAVITY_MAG])
 
 class AttitudeEKF:
     def __init__(self):
@@ -15,19 +17,19 @@ class AttitudeEKF:
 
         # ── Covariances ───────────────────────────────────────────────────
         self.P = np.diag([
-            0.1,  0.1,  0.1,    # orientation uncertainty  (rad²)
-            0.01, 0.01, 0.01,   # bias uncertainty         (rad²/s²)
-            0.01, 0.01, 0.01,   # bias uncertainty         (m²/s²)
+            0.5,  0.5,  0.5,    # orientation uncertainty  (rad²)
+            0.1, 0.1, 0.1,   # bias uncertainty         (rad²/s²)
+            0.1, 0.1, 0.1,   # bias uncertainty         (m²/s²)
         ])
 
         self.Q = np.diag([
-            5e-3, 5e-3, 5e-3,   # gyro white noise         (rad²/s)
-            1e-6, 1e-6, 1e-6,   # bias random walk         (rad²/s³)
-            1e-5, 1e-5, 1e-5,   # bias random walk         (m²/s³)
+            1e-3, 1e-3, 1e-3,   # gyro white noise         (rad²/s)
+            1e-5, 1e-5, 1e-5,   # bias random walk         (rad²/s³)
+            1e-3, 1e-3, 1e-3,   # bias random walk         (m²/s³)
         ])
 
         # ── Noise ───────────────────────────────────────────────────
-        self.R_acc = np.diag([5e-2, 5e-2, 5e-2])    # accel noise (tune per sensor)
+        self.R_acc = np.diag([1e-2, 1e-2, 1e-2])    # accel noise (tune per sensor)
 
 
     # ── Predict (gyroscope integration) ──────────────────────────────────────
@@ -51,6 +53,7 @@ class AttitudeEKF:
         G[6:9, 6:9] = np.eye(3) * dt
         # 4. Propagate error-state covariance
         self.P = F @ self.P @ F.T + G @ self.Q @ G.T
+        
 
     def _apply_correction(self, dx: np.ndarray):
         """Inject error-state correction into nominal state, then reset."""
@@ -66,10 +69,12 @@ class AttitudeEKF:
         K  = self.P @ H.T @ np.linalg.inv(S)             # Kalman gain
         dx = K @ residual                                 # error-state correction
         self.P = (np.eye(9) - K @ H) @ self.P            # covariance update
+        # I_KH = np.eye(9) - K @ H
+        # self.P = I_KH @ self.P @ I_KH.T + K @ R @ K.T
         return dx
 
     # ── Update 1: accelerometer (roll + pitch) ────────────────────────────────
-    def update_accel(self, acc: np.ndarray, gate: float = 0.5):
+    def update_accel(self, acc: np.ndarray, gate: float = 0.3):
         """
         Correct roll/pitch using accelerometer as gravity reference.
         Skipped when vehicle dynamics dominate (quasi-static gate).
@@ -78,13 +83,15 @@ class AttitudeEKF:
         """
         acc_corr = acc - self.ba
         acc_mag = np.linalg.norm(acc_corr)
-        if abs(acc_mag - 9.81) > gate:       # vehicle is accelerating → skip
+
+        if abs(acc_mag - GRAVITY_MAG) > gate:       # vehicle is accelerating → skip
             return
+        
 
         a_norm = acc_corr / acc_mag               # unit gravity direction, body frame
 
         R      = quat_to_rot(self.q)
-        g_pred = R.T @ (GRAVITY / 9.80665)     # expected unit gravity in body frame
+        g_pred = R.T @ (GRAVITY_VEC / GRAVITY_MAG)     # expected unit gravity in body frame
 
         residual = a_norm - g_pred           # (3,)
 
@@ -92,6 +99,7 @@ class AttitudeEKF:
         H = np.zeros((3, 9))
         H[0:3, 0:3] = skew(g_pred)          # ∂g_body/∂δθ
         H[0:3, 6:9] = -np.eye(3)
+
 
         dx = self._kalman_update(residual, H, self.R_acc)
         self._apply_correction(dx)
@@ -132,10 +140,10 @@ class AttitudeEKF:
 
         returns: linear acceleration in world frame (m/s^2)
         """
-        # 1. Rotación body → world
+        # 1. Rotación body
         acc_corr = acc - self.ba
         R = quat_to_rot(self.q)
-        g_body = R.T @ GRAVITY
+        g_body = R.T @ GRAVITY_VEC
         # 2. Quitar gravedad
         lin_acc_body = acc_corr - g_body
         return lin_acc_body 

@@ -5,21 +5,21 @@ import time
 import threading
 import collections
 from datetime import datetime
-from flask import Flask, jsonify, request, render_template, Response
+from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 import paho.mqtt.client as mqtt
 import subprocess
 import cv2
 
-# ── Config ──────────────────────────────────────────────────────────────────
+# ── Config ───────────────────────────────────────────────────────────────────
 BROKER_IP    = "192.168.100.6"
 PORT         = 1883
-TOPIC        = "imu/mean"
+TOPIC        = "imu/raw"
 DATA_DIR     = "data"
-CAMERA_INDEX = 1
+CAMERA_INDEX = 0
 CAMERA_FPS   = 25
-CAMERA_W     = 640
-CAMERA_H     = 480
+CAMERA_W     = 1920
+CAMERA_H     = 1080
 
 PACKET_RING_SIZE = 6000
 
@@ -38,13 +38,9 @@ assert PACKET_SIZE == 36, f"Expected 36 bytes, got {PACKET_SIZE}"
 # ── State ────────────────────────────────────────────────────────────────────
 state = {
     "receiving":             False,
-    "labeling":              False,
-    "label_start":           None,
-    "label_name":            None,
     "session_id":            None,
     "packet_count":          0,
     "last_packet":           None,
-    "labels":                [],
     # IMU
     "imu_csv_path":          None,
     "imu_csv_file":          None,
@@ -53,14 +49,11 @@ state = {
     "gps_csv_path":          None,
     "gps_csv_file":          None,
     "gps_csv_writer":        None,
-    # Labels
-    "labels_path":           None,
-    "_labels_file":          None,
-    "_labels_writer":        None,
     # Camera
     "cam_path":              None,
     "cam_timestamps_path":   None,
     "cam_frame_count":       0,
+    "session_dir":           None,
 }
 state_lock = threading.Lock()
 
@@ -83,17 +76,29 @@ def _log_event(level, msg):
     print(f"[MQTT/{level.upper()}] {msg}")
 
 # ── Camera ───────────────────────────────────────────────────────────────────
-_latest_frame_lock = threading.Lock()
-_latest_frame_jpeg = None
+# Preview is throttled: every PREVIEW_EVERY frames we resize to PREVIEW_W
+# and encode a JPEG — keeps CPU cost negligible at 1080p.
+# The VideoWriter always gets the full-res frame.
+
+PREVIEW_EVERY = 5          # encode preview every N capture frames (~5 fps preview at 25fps)
+PREVIEW_W     = 480        # preview width; height computed from aspect ratio
+
 _camera_running    = False
 _camera_thread     = None
+_latest_frame_jpeg = None
+_latest_frame_lock = threading.Lock()
+
+# Live camera stats (read by /status)
+_cam_stats      = {"fps": 0.0, "recording": False}
+_cam_stats_lock = threading.Lock()
 
 def _get_monotonic_ms():
     return int(time.time() * 1000)
 
 def _camera_loop():
-    global _latest_frame_jpeg, _camera_running
+    global _camera_running, _latest_frame_jpeg
     cap = cv2.VideoCapture(CAMERA_INDEX)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE,   1)   # drain stale frames — key fix for 1080p
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,  CAMERA_W)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_H)
     cap.set(cv2.CAP_PROP_FPS,          CAMERA_FPS)
@@ -102,25 +107,48 @@ def _camera_loop():
         print(f"[Camera] ERROR: Could not open camera index {CAMERA_INDEX}")
         _camera_running = False
         return
+    
+    actual_w   = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    actual_h   = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    actual_fps = cap.get(cv2.CAP_PROP_FPS)
+    prev_h     = int(PREVIEW_W * actual_h / actual_w)
+    print(f"[Camera] Opened {actual_w}x{actual_h} @ {actual_fps:.1f} fps  "
+          f"(preview {PREVIEW_W}x{prev_h} every {PREVIEW_EVERY} frames)")
 
-    print(f"[Camera] Opened {CAMERA_W}x{CAMERA_H} @ {CAMERA_FPS} fps")
     fourcc    = cv2.VideoWriter_fourcc(*"mp4v")
     writer    = None
     ts_file   = None
     ts_csv    = None
     frame_idx = 0
 
+    # FPS measurement
+    fps_counter = 0
+    fps_ts      = time.time()
+
     while _camera_running:
         ret, frame = cap.read()
         if not ret:
-            time.sleep(0.01)
-            continue
+            continue   # keep draining without sleeping
+
         now_ms = _get_monotonic_ms()
 
-        ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-        if ok:
-            with _latest_frame_lock:
-                _latest_frame_jpeg = buf.tobytes()
+        # ── FPS counter ──
+        fps_counter += 1
+        now_t = time.time()
+        if now_t - fps_ts >= 1.0:
+            measured = fps_counter / (now_t - fps_ts)
+            fps_counter = 0
+            fps_ts = now_t
+            with _cam_stats_lock:
+                _cam_stats["fps"] = round(measured, 1)
+
+        # ── Throttled preview encode (cheap: small resize before JPEG) ──
+        if frame_idx % PREVIEW_EVERY == 0:
+            small = cv2.resize(frame, (PREVIEW_W, prev_h), interpolation=cv2.INTER_LINEAR)
+            ok, buf = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 70])
+            if ok:
+                with _latest_frame_lock:
+                    _latest_frame_jpeg = buf.tobytes()
 
         with state_lock:
             recording = state["receiving"]
@@ -129,7 +157,7 @@ def _camera_loop():
 
         if recording and cam_path:
             if writer is None:
-                writer    = cv2.VideoWriter(cam_path, fourcc, CAMERA_FPS, (CAMERA_W, CAMERA_H))
+                writer    = cv2.VideoWriter(cam_path, fourcc, CAMERA_FPS, (actual_w, actual_h))
                 ts_file   = open(ts_path, "w", newline="")
                 ts_csv    = csv.DictWriter(ts_file, fieldnames=["frame_idx", "timestamp_ms"])
                 ts_csv.writeheader()
@@ -140,12 +168,16 @@ def _camera_loop():
             ts_file.flush()
             with state_lock:
                 state["cam_frame_count"] = frame_idx
+            with _cam_stats_lock:
+                _cam_stats["recording"] = True
             frame_idx += 1
 
         elif not recording and writer is not None:
             writer.release(); writer = None
             if ts_file: ts_file.close(); ts_file = None
             ts_csv = None; frame_idx = 0
+            with _cam_stats_lock:
+                _cam_stats["recording"] = False
             print("[Camera] Writer closed.")
 
     if writer:  writer.release()
@@ -177,37 +209,12 @@ def open_csv(path, headers):
     w.writeheader()
     return f, w
 
-def open_labels_csv(base_path):
-    path = base_path.replace(".csv", "_labels.csv")
-    f    = open(path, "w", newline="")
-    w    = csv.DictWriter(f, fieldnames=["label", "start_ms", "end_ms", "duration_ms"])
-    w.writeheader()
-    return path, f, w
-
-def camera_paths(ts):
-    return (os.path.join(DATA_DIR, f"video_{ts}.mp4"),
-            os.path.join(DATA_DIR, f"video_{ts}_frame_timestamps.csv"))
-
 # ── Packet decoder ────────────────────────────────────────────────────────────
 def decode_packet(payload):
-    """
-    Returns a dict with all fields, or None if the payload is invalid.
-    
-    Struct layout (36 bytes):
-      uint32  timestamp_ms
-      uint32  session_id
-      uint8   type          (0x01=IMU, 0x02=GPS)
-      uint8   _pad[3]       (ignored, consumed by '3x')
-      float   data[6]
-    
-    IMU  → data = [accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z]
-    GPS  → data = [lat, lon, speed_mps, course_deg, altitude_m, utc_seconds]
-    """
     if len(payload) != PACKET_SIZE:
         return None
 
     ts, sid, ptype, d0, d1, d2, d3, d4, d5 = struct.unpack(FMT, payload)
-
     base = {"timestamp_ms": ts, "session_id": sid, "type": ptype}
 
     if ptype == TYPE_IMU:
@@ -225,7 +232,7 @@ def decode_packet(payload):
             "utc_seconds": round(d5, 2),
         })
     else:
-        return None  # unknown type
+        return None
 
     return base
 
@@ -259,7 +266,6 @@ def on_message(client, userdata, msg):
 
     ptype = row["type"]
 
-    # ── Ring buffer ──
     with _packet_lock:
         row["_seq"] = _packet_seq
         _packet_seq += 1
@@ -281,31 +287,32 @@ def on_message(client, userdata, msg):
                 state["gps_csv_writer"].writerow(clean)
                 state["gps_csv_file"].flush()
 
-# ── Flask app ─────────────────────────────────────────────────────────────────
+# ── Flask app ──────────────────────────────────────────────────────────────────
 app = Flask(__name__)
 CORS(app)
 
 @app.route("/status")
 def status():
     with state_lock:
+        with _cam_stats_lock:
+            cs = dict(_cam_stats)
         return jsonify({
             "receiving":       state["receiving"],
-            "labeling":        state["labeling"],
-            "label_name":      state["label_name"],
-            "label_start":     state["label_start"],
             "packet_count":    state["packet_count"],
             "imu_csv_path":    state["imu_csv_path"],
             "gps_csv_path":    state["gps_csv_path"],
             "cam_path":        state["cam_path"],
             "cam_frame_count": state["cam_frame_count"],
+            "cam_fps":         cs["fps"],
+            "cam_recording":   cs["recording"],
             "last_packet":     state["last_packet"],
-            "labels":          state["labels"],
+            "session_dir":     state["session_dir"],
         })
 
 @app.route("/packets")
 def packets():
     since = int(request.args.get("since", -1))
-    ptype = request.args.get("type", None)   # optional: "imu" or "gps"
+    ptype = request.args.get("type", None)
     with _packet_lock:
         result = [p for p in _packet_ring if p["_seq"] > since]
     if ptype == "imu":
@@ -325,51 +332,36 @@ def start_recording():
         if state["receiving"]:
             return jsonify({"error": "Already recording"}), 400
 
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-
+        ts          = datetime.now().strftime("%Y%m%d_%H%M%S")
         session_dir = os.path.join(DATA_DIR, f"session_{ts}")
         os.makedirs(session_dir, exist_ok=True)
 
         imu_path = os.path.join(session_dir, "imu.csv")
         gps_path = os.path.join(session_dir, "gps.csv")
+        vid_path = os.path.join(session_dir, "video.mp4")
+        fts_path = os.path.join(session_dir, "video_frame_timestamps.csv")
 
         imu_f, imu_w = open_csv(imu_path, IMU_HEADERS)
         gps_f, gps_w = open_csv(gps_path, GPS_HEADERS)
 
-        lpath = os.path.join(session_dir, "labels.csv")
-        lf = open(lpath, "w", newline="")
-        lw = csv.DictWriter(lf, fieldnames=["label", "start_ms", "end_ms", "duration_ms"])
-        lw.writeheader()
-        # vid_path, fts_path = camera_paths(ts)
-        vid_path = os.path.join(session_dir, "video.mp4")
-        fts_path = os.path.join(session_dir, "video_frame_timestamps.csv")
-
         state.update({
             "receiving":           True,
             "packet_count":        0,
-            "labels":              [],
             "cam_frame_count":     0,
-            # IMU
             "imu_csv_path":        imu_path,
             "imu_csv_file":        imu_f,
             "imu_csv_writer":      imu_w,
-            # GPS
             "gps_csv_path":        gps_path,
             "gps_csv_file":        gps_f,
             "gps_csv_writer":      gps_w,
-            # Labels
-            "labels_path":         lpath,
-            "_labels_file":        lf,
-            "_labels_writer":      lw,
-            # Camera
             "cam_path":            vid_path,
             "cam_timestamps_path": fts_path,
-            "session_dir": session_dir,
+            "session_dir":         session_dir,
         })
 
-    _log_event("info", f"Recording started → IMU:{imu_path}  GPS:{gps_path}")
-    return jsonify({"status": "recording", "imu_csv": imu_path,
-                    "gps_csv": gps_path, "video": vid_path})
+    _log_event("info", f"Recording started → {session_dir}")
+    return jsonify({"status": "recording", "session_dir": session_dir,
+                    "imu_csv": imu_path, "gps_csv": gps_path, "video": vid_path})
 
 @app.route("/stop_recording", methods=["POST"])
 def stop_recording():
@@ -377,124 +369,35 @@ def stop_recording():
         if not state["receiving"]:
             return jsonify({"error": "Not recording"}), 400
 
-        if state["labeling"] and state["last_packet"]:
-            _close_label(state["last_packet"]["timestamp_ms"])
-
-        video_path = state["cam_path"]
-        state["receiving"]           = False
-        state["cam_path"]            = None
+        video_path             = state["cam_path"]
+        state["receiving"]     = False
+        state["cam_path"]      = None
         state["cam_timestamps_path"] = None
 
-        for key in ("imu_csv_file", "gps_csv_file", "_labels_file"):
+        for key in ("imu_csv_file", "gps_csv_file"):
             if state.get(key):
                 state[key].close()
                 state[key] = None
+        state["imu_csv_writer"] = state["gps_csv_writer"] = None
 
-        state["imu_csv_writer"] = state["gps_csv_writer"] = state["_labels_writer"] = None
+    pkt_count = state["packet_count"]
+    _log_event("info", f"Recording stopped ({pkt_count} packets)")
 
-    _log_event("info", f"Recording stopped ({state['packet_count']} packets)")
-
-    # ── Convert to H264 ──
+    # ── Convert to H.264 ──
     if video_path and os.path.exists(video_path):
         output_path = video_path.replace(".mp4", "_h264.mp4")
         cmd = ["ffmpeg", "-y", "-i", video_path,
                "-c:v", "libx264", "-pix_fmt", "yuv420p",
                "-movflags", "+faststart", output_path]
         try:
-            subprocess.run(cmd, check=True)
+            subprocess.run(cmd, check=True, capture_output=True)
             os.replace(output_path, video_path)
             print(f"[FFMPEG] Converted → {video_path}")
         except Exception as e:
             print(f"[FFMPEG] ERROR: {e}")
 
-    return jsonify({"status": "stopped", "packets": state["packet_count"],
+    return jsonify({"status": "stopped", "packets": pkt_count,
                     "video": video_path})
-
-@app.route("/start_label", methods=["POST"])
-def start_label():
-    data  = request.json or {}
-    label = data.get("label", "unknown").strip()
-    with state_lock:
-        if not state["receiving"]:
-            return jsonify({"error": "Not recording"}), 400
-        if state["labeling"]:
-            return jsonify({"error": "Label window already open"}), 400
-        ts = state["last_packet"]["timestamp_ms"] if state["last_packet"] else _get_monotonic_ms()
-        state.update({"labeling": True, "label_start": ts, "label_name": label})
-    return jsonify({"status": "labeling", "label": label, "start_ms": ts})
-
-@app.route("/stop_label", methods=["POST"])
-def stop_label():
-    with state_lock:
-        if not state["labeling"]:
-            return jsonify({"error": "No label window open"}), 400
-        ts    = state["last_packet"]["timestamp_ms"] if state["last_packet"] else _get_monotonic_ms()
-        entry = _close_label(ts)
-    return jsonify({"status": "label_saved", "entry": entry})
-
-def _close_label(end_ms):
-    entry = {
-        "label":       state["label_name"],
-        "start_ms":    state["label_start"],
-        "end_ms":      end_ms,
-        "duration_ms": end_ms - state["label_start"],
-    }
-    state["labels"].append(entry)
-    if state.get("_labels_writer"):
-        state["_labels_writer"].writerow(entry)
-        state["_labels_file"].flush()
-    state.update({"labeling": False, "label_start": None, "label_name": None})
-    return entry
-
-@app.route("/labels")
-def get_labels():
-    with state_lock:
-        return jsonify(state["labels"])
-
-@app.route("/sessions")
-def sessions():
-    sessions = []
-
-    if not os.path.exists(DATA_DIR):
-        return jsonify([])
-
-    for folder in sorted(os.listdir(DATA_DIR), reverse=True):
-        session_path = os.path.join(DATA_DIR, folder)
-
-        if not os.path.isdir(session_path):
-            continue
-
-        files = {
-            "session_id": folder,
-            "imu": None,
-            "gps": None,
-            "video": None,
-            "frame_ts": None,
-            "labels": None,
-        }
-
-        for fname in os.listdir(session_path):
-            fpath = os.path.join(session_path, fname)
-
-            if fname == "imu.csv":
-                files["imu"] = fpath
-            elif fname == "gps.csv":
-                files["gps"] = fpath
-            elif fname == "video.mp4":
-                files["video"] = fpath
-            elif fname == "video_frame_timestamps.csv":
-                files["frame_ts"] = fpath
-            elif fname == "labels.csv":
-                files["labels"] = fpath
-
-        sessions.append(files)
-
-    return jsonify(sessions)
-
-@app.route("/data/<path:filename>")
-def serve_data(filename):
-    from flask import send_from_directory
-    return send_from_directory(os.path.abspath(DATA_DIR), filename)
 
 def _mjpeg_generator():
     while True:
@@ -502,10 +405,11 @@ def _mjpeg_generator():
             frame = _latest_frame_jpeg
         if frame:
             yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
-        time.sleep(1 / CAMERA_FPS)
+        time.sleep(1 / (CAMERA_FPS / PREVIEW_EVERY))   # pace to preview rate
 
 @app.route("/video_feed")
 def video_feed():
+    from flask import Response
     return Response(_mjpeg_generator(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
 @app.route("/")
@@ -521,6 +425,6 @@ if __name__ == "__main__":
     client.on_message    = on_message
     client.connect(BROKER_IP, PORT, 60)
     threading.Thread(target=client.loop_forever, daemon=True).start()
-    print(f"[Server] Packet size: {PACKET_SIZE} bytes (TYPE_IMU=0x{TYPE_IMU:02X}, TYPE_GPS=0x{TYPE_GPS:02X})")
+    print(f"[Server] Packet size: {PACKET_SIZE} bytes")
     print("[Server] Running on http://localhost:5000")
     app.run(host="0.0.0.0", port=5000, debug=False)

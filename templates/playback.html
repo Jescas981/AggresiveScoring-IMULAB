@@ -152,7 +152,7 @@ header {
   justify-content: flex-end;
 }
 
-/* ── Accel mode toggle (Filt / Lin) ── */
+/* ── Accel mode toggle (Filt / Lin / Jerk) ── */
 .accel-mode-group { display: none; gap: 0; flex-shrink: 0; margin-left: 2px; align-items: center; }
 .accel-mode-btn {
   padding: 2px 7px; background: var(--s3); border: 1px solid var(--border);
@@ -162,7 +162,9 @@ header {
 }
 .accel-mode-btn:first-child { margin-left: 0; }
 .accel-mode-btn:hover { border-color: var(--border2); color: var(--text); z-index: 1; }
-.accel-mode-btn.active { background: #38bdf818; border-color: var(--cyan); color: var(--cyan); z-index: 2; }
+.accel-mode-btn.active          { background: #38bdf818; border-color: var(--cyan);    color: var(--cyan);    z-index: 2; }
+.accel-mode-btn.active.mode-lin { background: #34d39918; border-color: var(--emerald); color: var(--emerald); z-index: 2; }
+.accel-mode-btn.active.mode-jerk{ background: #f59e0b18; border-color: var(--amber);   color: var(--amber);   z-index: 2; }
 .accel-mode-sep { width: 1px; height: 14px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
 
 .channel-toggle {
@@ -369,7 +371,7 @@ input[type=range].scrubber:disabled { opacity: .3; cursor: not-allowed; }
     </div>
     <div class="charts-area">
 
-      <!-- Row 1: Accelerometer (Filt/Lin toggle in legend) -->
+      <!-- Row 1: Accelerometer (Filt/Lin/Jerk toggle in legend) -->
       <div class="chart-row" id="row-accel">
         <div class="chart-label" id="lbl-accel">Accelerometer · m/s²</div>
         <div class="chart-legend" id="legend-accel"></div>
@@ -391,7 +393,7 @@ input[type=range].scrubber:disabled { opacity: .3; cursor: not-allowed; }
         <canvas class="cv" id="cv-orient"></canvas>
       </div>
 
-      <!-- Row 4: GPS Speed (replaces linear acc) -->
+      <!-- Row 4: GPS Speed -->
       <div class="chart-row" id="row-gpsspeed" style="display:none;">
         <div class="chart-label">GPS Speed · m/s</div>
         <div class="chart-legend" id="legend-gpsspeed"></div>
@@ -449,94 +451,114 @@ const ACCEL_COLORS  = ['#38bdf8','#34d399','#f87171'];
 const GYRO_COLORS   = ['#fbbf24','#a78bfa','#fb923c'];
 const LINACC_COLORS = ['#67e8f9','#4ade80','#e879f9'];
 const ORIENT_COLORS = ['#f59e0b','#38bdf8','#a78bfa'];
+const JERK_COLORS   = ['#fbbf24','#6ee7b7','#fca5a5'];
 const GPS_SPD_COLOR = '#4ade80';
 
 const CHANNEL_NAMES = {
   accel:  ['X','Y','Z'], gyro: ['X','Y','Z'],
-  linacc: ['X','Y','Z'], orient: ['Roll','Pitch','Yaw'],
+  lpfacc: ['X','Y','Z'], orient: ['Roll','Pitch','Yaw'], jerk: ['X','Y','Z'],
 };
 const CHANNEL_COLORS = {
   accel: ACCEL_COLORS, gyro: GYRO_COLORS,
-  linacc: LINACC_COLORS, orient: ORIENT_COLORS,
+  lpfacc: LINACC_COLORS, orient: ORIENT_COLORS, jerk: JERK_COLORS,
 };
 
 const channelVisible = {
   accel: [true,true,true], gyro: [true,true,true],
-  linacc: [true,true,true], orient: [true,true,true],
+  lpfacc: [true,true,true], orient: [true,true,true], jerk: [true,true,true],
 };
 
-// ── Accel display mode: 'filtered' | 'linear' (only in filtered IMU source) ─
 let accelMode = 'filtered';
+
+function accelModeConfig(scales) {
+  if (imuSource === 'raw') {
+    return { chs: accelChans, colors: ACCEL_COLORS, scl: scales.accel, ts: timestamps };
+  }
+  switch (accelMode) {
+    case 'linear': return { chs: filLpfAccChans, colors: LINACC_COLORS, scl: scales.lpfacc,  ts: filtTimestamps };
+    case 'jerk':   return { chs: filtJerkChans,   colors: JERK_COLORS,   scl: scales.jerk,    ts: filtTimestamps };
+    default:       return { chs: filtAccelChans,  colors: ACCEL_COLORS,  scl: scales.accel,   ts: filtTimestamps };
+  }
+}
 
 function setAccelMode(mode) {
   accelMode = mode;
-  document.getElementById('accel-mode-filt').classList.toggle('active', mode === 'filtered');
-  document.getElementById('accel-mode-lin').classList.toggle('active', mode === 'linear');
-  
-  if (imuSource === 'filtered') {
-    document.getElementById('lbl-accel').textContent =
-      mode === 'linear' ? 'Linear Accel · m/s²' : 'Accel (filtered) · m/s²';
-    
-    // Actualizar el botón Auto para que refleje qué escala está controlando
-    const autoBtn = document.getElementById('autoscale-accel');
-    if (autoBtn) {
-      if (mode === 'linear') {
-        autoBtn.classList.toggle('on', autoScaleChart.linacc);
-        autoBtn.textContent = autoScaleChart.linacc ? '⦿ Auto' : 'Auto';
-      } else {
-        autoBtn.classList.toggle('on', autoScaleChart.accel);
-        autoBtn.textContent = autoScaleChart.accel ? '⦿ Auto' : 'Auto';
-      }
+  ['filtered','linear','jerk'].forEach(m => {
+    const btn = document.getElementById(`accel-mode-${m === 'filtered' ? 'filt' : m}`);
+    if (!btn) return;
+    btn.classList.toggle('active', m === mode);
+    btn.classList.remove('mode-lin','mode-jerk');
+    if (m === mode) {
+      if (m === 'linear') btn.classList.add('mode-lin');
+      if (m === 'jerk')   btn.classList.add('mode-jerk');
     }
+  });
+
+  const labelMap = {
+    filtered: 'Accel (filtered) · m/s²',
+    linear:   'Linear Accel · m/s²',
+    jerk:     'Jerk · m/s³',
+  };
+  if (imuSource === 'filtered') {
+    document.getElementById('lbl-accel').textContent = labelMap[mode] ?? labelMap.filtered;
   }
+
+  const cols = (imuSource === 'raw') ? ACCEL_COLORS
+    : (mode === 'linear' ? LINACC_COLORS : mode === 'jerk' ? JERK_COLORS : ACCEL_COLORS);
+  cols.forEach((c, i) => {
+    const btn = document.getElementById(`ch-accel-${i}`);
+    if (btn) btn.style.color = c;
+  });
+
+  updateAutoscaleButtons();
 }
 
 function toggleChannel(chartName, idx) {
   channelVisible[chartName][idx] = !channelVisible[chartName][idx];
+  console.log(`Toggled ${chartName} channel ${idx} to ${channelVisible[chartName][idx]}`);
   const btn = document.getElementById(`ch-${chartName}-${idx}`);
   if (btn) btn.classList.toggle('active', channelVisible[chartName][idx]);
 }
 
-// ── Build accel legend: [Filt|Lin] separator [X][Y][Z] [Auto] ─────────────
 function buildAccelLegend() {
   const legend = document.getElementById('legend-accel');
   legend.innerHTML = '';
 
-  // Filt / Lin mode group (hidden until filtered IMU source active)
   const modeGroup = document.createElement('div');
   modeGroup.className = 'accel-mode-group';
   modeGroup.id = 'accel-mode-group';
 
-  const mFilt = document.createElement('button');
-  mFilt.id = 'accel-mode-filt'; mFilt.className = 'accel-mode-btn active';
-  mFilt.textContent = 'Filt'; mFilt.title = 'Show filtered accelerometer';
-  mFilt.addEventListener('click', e => { e.stopPropagation(); setAccelMode('filtered'); });
+  const modes = [
+    { id: 'accel-mode-filt', mode: 'filtered', label: 'Filt', title: 'Filtered accelerometer' },
+    { id: 'accel-mode-linear',  mode: 'linear',   label: 'Lin',  title: 'Linear acceleration (gravity removed)' },
+    { id: 'accel-mode-jerk',    mode: 'jerk',     label: 'Jerk', title: 'Jerk · d(accel)/dt  (m/s³)' },
+  ];
+  modes.forEach(({ id, mode, label, title }) => {
+    const btn = document.createElement('button');
+    btn.id = id;
+    btn.className = 'accel-mode-btn' + (mode === 'filtered' ? ' active' : '');
+    btn.textContent = label;
+    btn.title = title;
+    btn.addEventListener('click', e => { e.stopPropagation(); setAccelMode(mode); });
+    modeGroup.appendChild(btn);
+  });
 
-  const mLin = document.createElement('button');
-  mLin.id = 'accel-mode-lin'; mLin.className = 'accel-mode-btn';
-  mLin.textContent = 'Lin'; mLin.title = 'Show linear acceleration';
-  mLin.addEventListener('click', e => { e.stopPropagation(); setAccelMode('linear'); });
-
-  modeGroup.appendChild(mFilt);
-  modeGroup.appendChild(mLin);
   legend.appendChild(modeGroup);
 
-  // Separator line
   const sep = document.createElement('div');
   sep.className = 'accel-mode-sep';
+  sep.id = 'accel-mode-sep';
   legend.appendChild(sep);
 
-  // XYZ channel toggles
   ACCEL_COLORS.forEach((color, i) => {
     const btn = document.createElement('button');
     btn.id = `ch-accel-${i}`; btn.className = 'channel-toggle active';
     btn.style.color = color;
     btn.innerHTML = `<span class="ch-label">${CHANNEL_NAMES.accel[i]}</span><span class="ch-val" id="val-accel-${i}"> —</span>`;
-    btn.addEventListener('click', e => { e.stopPropagation(); toggleChannel('accel', i); });
+    btn.addEventListener('click', e => { e.stopPropagation(); toggleChannel('accel', i);});
     legend.appendChild(btn);
   });
 
-  // Autoscale
   const aBtn = document.createElement('button');
   aBtn.id = 'autoscale-accel'; aBtn.className = 'draw-pill';
   aBtn.style.cssText = 'margin-left:4px; pointer-events:all;';
@@ -545,7 +567,6 @@ function buildAccelLegend() {
   legend.appendChild(aBtn);
 }
 
-// ── Standard legend builder ────────────────────────────────────────────────
 function buildLegend(chartName) {
   const legend = document.getElementById(`legend-${chartName}`);
   if (!legend) return;
@@ -567,7 +588,6 @@ function buildLegend(chartName) {
   legend.appendChild(aBtn);
 }
 
-// ── GPS Speed legend ───────────────────────────────────────────────────────
 function buildGpsSpeedLegend() {
   const legend = document.getElementById('legend-gpsspeed');
   if (!legend) return;
@@ -623,41 +643,46 @@ function fmtVal(v) {
 }
 
 function updateAllChannelValues() {
-  const ts = imuSource==='raw' ? timestamps : filtTimestamps;
-  const accelChs = imuSource==='raw' ? accelChans
-    : (accelMode==='linear' ? filtLinAccChans : filtAccelChans);
+  const ts  = imuSource==='raw' ? timestamps : filtTimestamps;
 
-  accelChs.forEach((ch,i) => {
-    const el=document.getElementById(`val-accel-${i}`);
-    if (el) el.textContent = channelVisible.accel[i] ? fmtVal(interpolateAtMs(ch,ts,currentMs)) : '';
+  let accelChs;
+  if (imuSource === 'raw') {
+    accelChs = accelChans;
+  } else if (accelMode === 'linear') {
+    accelChs = filLpfAccChans;
+  } else if (accelMode === 'jerk') {
+    accelChs = filtJerkChans;
+  } else {
+    accelChs = filtAccelChans;
+  }
+  accelChs.forEach((ch, i) => {
+    const el = document.getElementById(`val-accel-${i}`);
+    if (el) el.textContent = channelVisible.accel[i] ? fmtVal(interpolateAtMs(ch, ts, currentMs)) : '';
   });
 
   const gyroChs = imuSource==='raw' ? gyroChans : filtGyroChans;
-  gyroChs.forEach((ch,i) => {
-    const el=document.getElementById(`val-gyro-${i}`);
-    if (el) el.textContent = channelVisible.gyro[i] ? fmtVal(interpolateAtMs(ch,ts,currentMs)) : '';
+  gyroChs.forEach((ch, i) => {
+    const el = document.getElementById(`val-gyro-${i}`);
+    if (el) el.textContent = channelVisible.gyro[i] ? fmtVal(interpolateAtMs(ch, ts, currentMs)) : '';
   });
 
   if (imuSource==='filtered') {
-    filtOrientChans.forEach((ch,i) => {
-      const el=document.getElementById(`val-orient-${i}`);
-      if (el) el.textContent = channelVisible.orient[i] ? fmtVal(interpolateAtMs(ch,filtTimestamps,currentMs)) : '';
+    filtOrientChans.forEach((ch, i) => {
+      const el = document.getElementById(`val-orient-${i}`);
+      if (el) el.textContent = channelVisible.orient[i] ? fmtVal(interpolateAtMs(ch, filtTimestamps, currentMs)) : '';
     });
   }
 
   if (gpsData.length) {
-    const el=document.getElementById('val-gpsspeed');
-    // if (el) { const v=interpolateGpsSpeed(currentMs); el.textContent=v!==null?` ${v.toFixed(2)} m/s`:' —'; }
+    const el = document.getElementById('val-gpsspeed');
     if (el) {
-    const v = interpolateGpsSpeed(currentMs);
-
-    if (v !== null) {
-        const kmh = v * 3.6;
-        el.textContent = ` ${v.toFixed(2)} m/s (${kmh.toFixed(2)} km/h)`;
-    } else {
+      const v = interpolateGpsSpeed(currentMs);
+      if (v !== null) {
+        el.textContent = ` ${v.toFixed(2)} m/s (${(v*3.6).toFixed(2)} km/h)`;
+      } else {
         el.textContent = ' —';
+      }
     }
-}
   }
 }
 
@@ -676,14 +701,16 @@ let accelChans=[[],[],[]], gyroChans=[[],[],[]];
 let timestamps=[], accelScale=null, gyroScale=null;
 
 let filtAccelChans=[[],[],[]], filtGyroChans=[[],[],[]];
-let filtLinAccChans=[[],[],[]], filtOrientChans=[[],[],[]];
+let filLpfAccChans=[[],[],[]], filtOrientChans=[[],[],[]];
+let filtJerkChans=[[],[],[]];
 let filtTimestamps=[];
-let filtAccelScale=null, filtGyroScale=null, filtLinAccScale=null, filtOrientScale=null;
-let hasFiltered=false;
+let filtAccelScale=null, filtGyroScale=null, filtLpfAccScale=null;
+let filtOrientScale=null, filtJerkScale=null;
+let hasFiltered=false, hasJerk=false;
 
 let gpsSpeedScale=null;
 
-let autoScaleChart={accel:false,gyro:false,linacc:false,orient:false,gpsspeed:false};
+let autoScaleChart={accel:false,gyro:false,lpfacc:false,orient:false,jerk:false,gpsspeed:false};
 let visibleRange={start:0,end:0};
 let imuSource='raw';
 let minTs=0, maxTs=1;
@@ -776,52 +803,39 @@ function computeVisibleGpsSpeedScale(viewStart,viewEnd) {
   return {mn:Math.max(0,mn-range*0.05),mx:mx+range*0.05};
 }
 
-function updateAutoscaleButtons() {
-  // Actualizar todos los botones normalmente
-  ['gyro', 'linacc', 'orient', 'gpsspeed'].forEach(name => {
-    const btn = document.getElementById(`autoscale-${name}`);
-    if (btn) {
-      btn.classList.toggle('on', autoScaleChart[name]);
-      btn.textContent = autoScaleChart[name] ? '⦿ Auto' : 'Auto';
-    }
-  });
-  
-  // Para accel, mostrar el estado según el modo actual
-  const autoBtn = document.getElementById('autoscale-accel');
-  if (autoBtn) {
-    const isAuto = imuSource === 'filtered' && accelMode === 'linear' 
-      ? autoScaleChart.linacc 
-      : autoScaleChart.accel;
-    autoBtn.classList.toggle('on', isAuto);
-    autoBtn.textContent = isAuto ? '⦿ Auto' : 'Auto';
-  }
+// ── Autoscale ──────────────────────────────────────────────────────────────
+function accelAutoKey() {
+  if (imuSource !== 'filtered') return 'accel';
+  if (accelMode === 'linear') return 'lpfacc';
+  if (accelMode === 'jerk')   return 'jerk';
+  return 'accel';
 }
 
 function toggleAutoScale(chartName) {
-  if (imuSource === 'filtered' && chartName === 'accel') {
-    // Cuando estamos en filtered, el botón accel controla la escala actual (filt o lin)
-    if (accelMode === 'linear') {
-      autoScaleChart.linacc = !autoScaleChart.linacc;
-      updateAutoscaleButtonVisual('linacc', autoScaleChart.linacc);
-    } else {
-      autoScaleChart.accel = !autoScaleChart.accel;
-      updateAutoscaleButtonVisual('accel', autoScaleChart.accel);
-    }
-    // Actualizar el botón accel para que muestre el estado correcto
-    updateAutoscaleButtonVisual('accel', autoScaleChart[accelMode === 'linear' ? 'linacc' : 'accel']);
+  if (chartName === 'accel') {
+    const key = accelAutoKey();
+    autoScaleChart[key] = !autoScaleChart[key];
   } else {
     autoScaleChart[chartName] = !autoScaleChart[chartName];
-    updateAutoscaleButtonVisual(chartName, autoScaleChart[chartName]);
   }
   updateAutoscaleButtons();
   buildTicks();
 }
 
 function updateAutoscaleButtons() {
-  ['accel','gyro','linacc','orient','gpsspeed'].forEach(name => {
-    const btn=document.getElementById(`autoscale-${name}`);
-    if (btn) { btn.classList.toggle('on',autoScaleChart[name]); btn.textContent=autoScaleChart[name]?'⦿ Auto':'Auto'; }
+  ['gyro','lpfacc','orient','jerk','gpsspeed'].forEach(name => {
+    const btn = document.getElementById(`autoscale-${name}`);
+    if (btn) {
+      btn.classList.toggle('on', autoScaleChart[name]);
+      btn.textContent = autoScaleChart[name] ? '⦿ Auto' : 'Auto';
+    }
   });
+  const aBtn = document.getElementById('autoscale-accel');
+  if (aBtn) {
+    const on = autoScaleChart[accelAutoKey()];
+    aBtn.classList.toggle('on', on);
+    aBtn.textContent = on ? '⦿ Auto' : 'Auto';
+  }
 }
 
 function updateAutoFollow() {
@@ -860,6 +874,51 @@ function buildTicks() {
   }
 }
 
+// ── Scales ─────────────────────────────────────────────────────────────────
+function getScales() {
+  const vs = visibleRange.start, ve = visibleRange.end;
+  const gpsScl = autoScaleChart.gpsspeed ? (computeVisibleGpsSpeedScale(vs, ve) || gpsSpeedScale) : gpsSpeedScale;
+
+  if (imuSource === 'raw') {
+    return {
+      accel:    autoScaleChart.accel
+                  ? computeVisibleScale(accelChans, timestamps, vs, ve, channelVisible.accel) || accelScale
+                  : accelScale,
+      gyro:     autoScaleChart.gyro
+                  ? computeVisibleScale(gyroChans, timestamps, vs, ve, channelVisible.gyro) || gyroScale
+                  : gyroScale,
+      gpsspeed: gpsScl,
+    };
+  }
+
+  const accelCandidates = {
+    filtered: { chs: filtAccelChans,  base: filtAccelScale,  key: 'accel'  },
+    linear:   { chs: filLpfAccChans, base: filtLpfAccScale, key: 'lpfacc' },
+    jerk:     { chs: filtJerkChans,   base: filtJerkScale,   key: 'jerk'   },
+  };
+  const { chs: accelChs, base: accelBase, key: aKey } = accelCandidates[accelMode] ?? accelCandidates.filtered;
+  const accelScl = autoScaleChart[aKey]
+    ? computeVisibleScale(accelChs, filtTimestamps, vs, ve, channelVisible.accel) || accelBase
+    : accelBase;
+
+  return {
+    accel:    accelScl,
+    gyro:     autoScaleChart.gyro
+                ? computeVisibleScale(filtGyroChans, filtTimestamps, vs, ve, channelVisible.gyro) || filtGyroScale
+                : filtGyroScale,
+    lpfacc:   autoScaleChart.lpfacc
+                ? computeVisibleScale(filLpfAccChans, filtTimestamps, vs, ve, channelVisible.accel) || filtLpfAccScale
+                : filtLpfAccScale,
+    jerk:     autoScaleChart.jerk
+                ? computeVisibleScale(filtJerkChans, filtTimestamps, vs, ve, channelVisible.jerk) || filtJerkScale
+                : filtJerkScale,
+    orient:   autoScaleChart.orient
+                ? computeVisibleScale(filtOrientChans, filtTimestamps, vs, ve, channelVisible.orient) || filtOrientScale
+                : filtOrientScale,
+    gpsspeed: gpsScl,
+  };
+}
+
 // ── Main loop ──────────────────────────────────────────────────────────────
 let _raf=null,_lastFrameT=0,_lastVideoSync=-999,_tickThrottle=0;
 
@@ -880,17 +939,17 @@ function mainLoop(t) {
   }
   _lastFrameT=t;
   visibleRange.start=viewOffsetMs; visibleRange.end=viewOffsetMs+effectiveWindow();
+  
   const scales=getScales();
 
   if (imuSource==='raw') {
-    drawIMUChart(cvAccel,ctxA,accelChans,scales.accel,ACCEL_COLORS,timestamps,channelVisible.accel);
-    drawIMUChart(cvGyro, ctxG,gyroChans, scales.gyro, GYRO_COLORS, timestamps,channelVisible.gyro);
+    drawIMUChart(cvAccel, ctxA, accelChans,   scales.accel, ACCEL_COLORS, timestamps, channelVisible.accel);
+    drawIMUChart(cvGyro,  ctxG, gyroChans,    scales.gyro,  GYRO_COLORS,  timestamps, channelVisible.gyro);
   } else {
-    const accelChs   = accelMode==='linear' ? filtLinAccChans : filtAccelChans;
-    const accelScale = accelMode==='linear' ? scales.linacc   : scales.accel;
-    drawIMUChart(cvAccel,  ctxA, accelChs,      accelScale,   ACCEL_COLORS,  filtTimestamps,channelVisible.accel);
-    drawIMUChart(cvGyro,   ctxG, filtGyroChans, scales.gyro,  GYRO_COLORS,   filtTimestamps,channelVisible.gyro);
-    drawIMUChart(cvOrient, ctxO, filtOrientChans,scales.orient,ORIENT_COLORS,filtTimestamps,channelVisible.orient);
+    const { chs, colors, scl, ts } = accelModeConfig(scales);
+    drawIMUChart(cvAccel,  ctxA, chs,              scl,          colors,       ts,             channelVisible.accel);
+    drawIMUChart(cvGyro,   ctxG, filtGyroChans,    scales.gyro,  GYRO_COLORS,  filtTimestamps, channelVisible.gyro);
+    drawIMUChart(cvOrient, ctxO, filtOrientChans,  scales.orient,ORIENT_COLORS,filtTimestamps, channelVisible.orient);
   }
 
   drawGpsSpeedChart(scales.gpsspeed);
@@ -899,68 +958,74 @@ function mainLoop(t) {
   _raf=requestAnimationFrame(mainLoop);
 }
 
-function getScales() {
-  const vs = visibleRange.start, ve = visibleRange.end;
-  const gpsScl = autoScaleChart.gpsspeed ? (computeVisibleGpsSpeedScale(vs, ve) || gpsSpeedScale) : gpsSpeedScale;
-  
-  if (imuSource === 'raw') {
-    return {
-      accel: autoScaleChart.accel ? computeVisibleScale(accelChans, timestamps, vs, ve, channelVisible.accel) || accelScale : accelScale,
-      gyro:  autoScaleChart.gyro ? computeVisibleScale(gyroChans, timestamps, vs, ve, channelVisible.gyro) || gyroScale : gyroScale,
-      gpsspeed: gpsScl,
-    };
-  }
-  
-  // For filtered mode - handle accel mode correctly
-  let accelScaleData, accelAutoKey;
-  if (accelMode === 'linear') {
-    accelScaleData = filtLinAccChans;
-    accelAutoKey = 'linacc';  // Use linacc's autoscale setting
-  } else {
-    accelScaleData = filtAccelChans;
-    accelAutoKey = 'accel';
-  }
-  
-  const accelAuto = autoScaleChart[accelAutoKey];
-  const accelComputed = accelAuto ? computeVisibleScale(accelScaleData, filtTimestamps, vs, ve, channelVisible.accel) || 
-                        (accelMode === 'linear' ? filtLinAccScale : filtAccelScale) 
-                        : (accelMode === 'linear' ? filtLinAccScale : filtAccelScale);
-  
-  return {
-    accel:  accelComputed,
-    gyro:   autoScaleChart.gyro ? computeVisibleScale(filtGyroChans, filtTimestamps, vs, ve, channelVisible.gyro) || filtGyroScale : filtGyroScale,
-    linacc: autoScaleChart.linacc ? computeVisibleScale(filtLinAccChans, filtTimestamps, vs, ve, channelVisible.linacc) || filtLinAccScale : filtLinAccScale,
-    orient: autoScaleChart.orient ? computeVisibleScale(filtOrientChans, filtTimestamps, vs, ve, channelVisible.orient) || filtOrientScale : filtOrientScale,
-    gpsspeed: gpsScl,
-  };
-}
-
 // ── Drawing helpers ────────────────────────────────────────────────────────
-function drawYAxis(ctx,W,PH,scale) {
+
+// ── Labeled horizontal axis ── replaces unlabeled fixed gridlines ──────────
+// Computes nice tick intervals from the actual scale, draws value-aligned
+// horizontal gridlines, labels each on the left edge, and draws a left axis line.
+function drawLabeledHAxis(ctx, W, PH, scale) {
   if (!scale) return;
-  const {mn,mx}=scale, rng=mx-mn||1, sY=PH/rng;
-  ctx.font="8px 'Azeret Mono'"; ctx.textBaseline='middle';
-  for (let i=0;i<=5;i++) {
-    const v=mn+rng*i/5, y=PH-(v-mn)*sY;
-    if (y<6||y>PH-6) continue;
-    const label=Math.abs(v)<0.001?'0':Math.abs(v)<10?v.toFixed(2):Math.abs(v)<100?v.toFixed(1):v.toFixed(0);
-    const tw=ctx.measureText(label).width;
-    ctx.fillStyle='rgba(6,8,16,0.82)'; ctx.fillRect(3,y-6,tw+6,12);
-    ctx.strokeStyle='#1d2a3d'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(tw+12,y); ctx.stroke();
-    ctx.fillStyle='#4a607e'; ctx.fillText(label,5,y);
+  const { mn, mx } = scale, rng = mx - mn || 1;
+
+  // Nice tick interval — same strategy as niceInterval()
+  const raw  = rng / 5;
+  const mag  = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1e-10))));
+  const norm = raw / mag;
+  const interval = (norm < 1.5 ? 1 : norm < 3.5 ? 2 : norm < 7.5 ? 5 : 10) * mag;
+  const firstTick = Math.ceil((mn + interval * 0.001) / interval) * interval;
+
+  ctx.save();
+  ctx.font = "8px 'Azeret Mono'";
+  ctx.textBaseline = 'middle';
+
+  for (let step = 0; step < 40; step++) {
+    // Avoid float drift on many iterations
+    const v = firstTick + step * interval;
+    if (v > mx + interval * 0.001) break;
+    const y = PH - ((v - mn) / rng) * PH;
+    if (y < 3 || y > PH - 3) continue;
+
+    const isZero = Math.abs(v) < interval * 0.02;
+
+    // Horizontal gridline — zero line is slightly brighter and dashed
+    ctx.strokeStyle = isZero ? '#ffffff22' : '#0e1c30';
+    ctx.lineWidth   = isZero ? 1.5 : 1;
+    ctx.setLineDash(isZero ? [4, 5] : []);
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Value label — dark pill behind text for readability over signals
+    const absV = Math.abs(v);
+    const lbl = absV < 1e-9 ? '0'
+      : absV < 0.01 ? v.toFixed(4)
+      : absV < 10   ? v.toFixed(2)
+      : absV < 100  ? v.toFixed(1)
+      : v.toFixed(0);
+    const tw = ctx.measureText(lbl).width;
+    ctx.fillStyle = 'rgba(6,8,16,0.82)';
+    ctx.fillRect(2, y - 6, tw + 6, 13);
+    ctx.fillStyle = isZero ? '#6080a0' : '#3a5272';
+    ctx.fillText(lbl, 4, y);
   }
-  const rl=`[${mn.toFixed(1)}, ${mx.toFixed(1)}]`, rw=ctx.measureText(rl).width;
-  ctx.fillStyle='rgba(6,8,16,0.72)'; ctx.fillRect(2,PH-20,rw+8,13);
-  ctx.fillStyle='#2d3f58'; ctx.fillText(rl,5,PH-14);
-  ctx.textBaseline='alphabetic';
+
+  // Solid left axis line
+  ctx.strokeStyle = '#1d2a3d';
+  ctx.lineWidth   = 1;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(0.5, 0);
+  ctx.lineTo(0.5, PH);
+  ctx.stroke();
+
+  ctx.restore();
 }
 
 function drawGridAndAxis(ctx,W,H,PAD,PH) {
   const wMs=effectiveWindow(), viewEnd=viewOffsetMs+wMs;
-  ctx.strokeStyle='#0d1420'; ctx.lineWidth=1; ctx.beginPath();
-  for(let i=1;i<4;i++){ctx.moveTo(0,PH*i/4);ctx.lineTo(W,PH*i/4);}
-  ctx.stroke();
+  // Horizontal gridlines are drawn by drawLabeledHAxis (value-aligned, labelled)
   const gi=niceInterval(wMs,6), gs=Math.ceil(viewOffsetMs/gi)*gi;
   ctx.strokeStyle='#111d2e'; ctx.lineWidth=1; ctx.beginPath();
   for(let t=gs;t<=viewEnd;t+=gi){const x=msToX(t,W);ctx.moveTo(x,0);ctx.lineTo(x,PH);}
@@ -1013,7 +1078,11 @@ function drawIMUChart(cv,ctx,channels,scale,colors,tsArr,visible) {
   const PAD=16, PH=H-PAD;
   ctx.fillStyle='#060810'; ctx.fillRect(0,0,W,H);
   if (!tsArr||!tsArr.length) return;
-  const {viewEnd}=drawGridAndAxis(ctx,W,H,PAD,PH);
+
+  // Draw labeled horizontal axis first (behind signals)
+  drawLabeledHAxis(ctx,W,PH,scale);
+
+  const {viewEnd} = drawGridAndAxis(ctx,W,H,PAD,PH);
   drawLabelBands(ctx,W,PH);
   drawDragSel(ctx,W,PH);
 
@@ -1049,16 +1118,8 @@ function drawIMUChart(cv,ctx,channels,scale,colors,tsArr,visible) {
         ctx.fill(); ctx.stroke();
       });
     }
-
-    // Zero line
-    const zy=PH-(0-mn)*sY;
-    if (zy>0&&zy<PH) {
-      ctx.strokeStyle='#ffffff18'; ctx.lineWidth=1; ctx.setLineDash([4,6]);
-      ctx.beginPath(); ctx.moveTo(0,zy); ctx.lineTo(W,zy); ctx.stroke(); ctx.setLineDash([]);
-    }
   }
 
-  drawYAxis(ctx,W,PH,scale);
   drawCursorLine(ctx,W,PH);
 }
 
@@ -1068,6 +1129,9 @@ function drawGpsSpeedChart(scale) {
   const PAD=16, PH=H-PAD;
   ctx.fillStyle='#060810'; ctx.fillRect(0,0,W,H);
   if (!gpsData.length||!scale) return;
+
+  // Draw labeled horizontal axis first (behind fill)
+  drawLabeledHAxis(ctx,W,PH,scale);
 
   const {viewEnd}=drawGridAndAxis(ctx,W,H,PAD,PH);
   drawLabelBands(ctx,W,PH);
@@ -1080,7 +1144,6 @@ function drawGpsSpeedChart(scale) {
   let iStart=0;
   for(let i=0;i<gpsData.length;i++){if(gpsData[i].timestamp_ms>=vStart){iStart=Math.max(0,i-1);break;}}
 
-  // Filled area
   ctx.beginPath();
   let first=true, lastX=0;
   for(let i=iStart;i<gpsData.length;i++){
@@ -1096,7 +1159,6 @@ function drawGpsSpeedChart(scale) {
     ctx.fillStyle=grad; ctx.fill();
   }
 
-  // Speed line
   ctx.beginPath(); first=true;
   for(let i=iStart;i<gpsData.length;i++){
     const p=gpsData[i]; if(p.timestamp_ms>vEnd_m) break;
@@ -1105,7 +1167,6 @@ function drawGpsSpeedChart(scale) {
   }
   ctx.strokeStyle=GPS_SPD_COLOR; ctx.lineWidth=1.6; ctx.setLineDash([]); ctx.stroke();
 
-  // Cursor dot
   const cxPos=msToX(currentMs,W);
   if (cxPos>=0&&cxPos<=W) {
     const sv=interpolateGpsSpeed(currentMs);
@@ -1117,14 +1178,6 @@ function drawGpsSpeedChart(scale) {
     }
   }
 
-  // Zero line (only if mn > 0 baseline not at 0)
-  const zy=PH-(0-mn)*sY;
-  if (zy>0&&zy<PH) {
-    ctx.strokeStyle='#ffffff18'; ctx.lineWidth=1; ctx.setLineDash([4,6]);
-    ctx.beginPath(); ctx.moveTo(0,zy); ctx.lineTo(W,zy); ctx.stroke(); ctx.setLineDash([]);
-  }
-
-  drawYAxis(ctx,W,PH,scale);
   drawCursorLine(ctx,W,PH);
 }
 
@@ -1132,23 +1185,29 @@ function drawGpsSpeedChart(scale) {
 function setImuSource(src) {
   imuSource=src;
   ['raw','filtered'].forEach(s=>document.getElementById(`src-${s}`).classList.toggle('active',s===src));
-  const isFilt=src==='filtered';
-  document.getElementById('row-orient').style.display=isFilt?'':'none';
-  const mg=document.getElementById('accel-mode-group');
-  if (mg) mg.style.display=isFilt?'flex':'none';
-  const sep=mg?mg.nextElementSibling:null;
-  if (sep&&sep.classList.contains('accel-mode-sep')) sep.style.display=isFilt?'block':'none';
+  const isFilt = src==='filtered';
+
+  document.getElementById('row-orient').style.display = isFilt ? '' : 'none';
+
+  const mg  = document.getElementById('accel-mode-group');
+  const sep = document.getElementById('accel-mode-sep');
+  if (mg)  mg.style.display  = isFilt ? 'flex' : 'none';
+  if (sep) sep.style.display = isFilt ? 'block' : 'none';
+
+  const jBtn = document.getElementById('accel-mode-jerk');
+  if (jBtn) jBtn.disabled = isFilt ? !hasJerk : true;
 
   if (isFilt) {
-    document.getElementById('lbl-accel').textContent=accelMode==='linear'?'Linear Accel · m/s²':'Accel (filtered) · m/s²';
-    document.getElementById('lbl-gyro').textContent='Angular Velocity · rad/s';
+    const labelMap = { filtered:'Accel (filtered) · m/s²', linear:'Linear Accel · m/s²', jerk:'Jerk · m/s³' };
+    document.getElementById('lbl-accel').textContent = labelMap[accelMode] ?? labelMap.filtered;
+    document.getElementById('lbl-gyro').textContent  = 'Angular Velocity · rad/s';
   } else {
-    document.getElementById('lbl-accel').textContent='Accelerometer · m/s²';
-    document.getElementById('lbl-gyro').textContent='Gyroscope · rad/s';
-    accelMode='filtered';
-    document.getElementById('accel-mode-filt').classList.add('active');
-    document.getElementById('accel-mode-lin').classList.remove('active');
+    document.getElementById('lbl-accel').textContent = 'Accelerometer · m/s²';
+    document.getElementById('lbl-gyro').textContent  = 'Gyroscope · rad/s';
+    if (accelMode === 'linear' || accelMode === 'jerk') setAccelMode('filtered');
   }
+
+  setAccelMode(isFilt ? accelMode : 'filtered');
   requestAnimationFrame(()=>resize());
 }
 
@@ -1179,9 +1238,9 @@ function drawTrack() {
 function drawMinimap() {
   const W=cvMinimap.width, H=cvMinimap.height; if(!W||!H) return;
   ctxMM.fillStyle='#0b0f18'; ctxMM.fillRect(0,0,W,H);
-  const ts=imuSource==='filtered'?filtTimestamps:timestamps;
-  const chs=imuSource==='filtered'?filtAccelChans:accelChans;
-  const scl=imuSource==='filtered'?filtAccelScale:accelScale;
+  const ts  = imuSource==='filtered' ? filtTimestamps : timestamps;
+  const chs = imuSource==='filtered' ? filtAccelChans : accelChans;
+  const scl = imuSource==='filtered' ? filtAccelScale  : accelScale;
   if (!ts.length) return;
   if (scl&&ts.length>1) {
     const {mn,mx}=scl, rng=mx-mn||1, step=Math.max(1,Math.floor(ts.length/W));
@@ -1431,18 +1490,30 @@ async function fetchCSV(path){
 }
 
 function parseFilteredIMU(rows) {
-  if(!rows.length)return false;
+  if (!rows.length) return false;
   const rawT0=rows[0].t; let tFactor=1;
-  if(rawT0>1e9)tFactor=1/1000; else if(rawT0<1e4)tFactor=1000;
-  filtTimestamps  =rows.map(r=>r.t*tFactor);
-  filtGyroChans   =[rows.map(r=>r.gx),rows.map(r=>r.gy),rows.map(r=>r.gz)];
-  filtAccelChans  =[rows.map(r=>r.ax),rows.map(r=>r.ay),rows.map(r=>r.az)];
-  filtLinAccChans =[rows.map(r=>r.alin_x),rows.map(r=>r.alin_y),rows.map(r=>r.alin_z)];
-  filtOrientChans =[rows.map(r=>r.roll),rows.map(r=>r.pitch),rows.map(r=>r.yaw)];
-  filtAccelScale  =computeScale(filtAccelChans,channelVisible.accel);
-  filtGyroScale   =computeScale(filtGyroChans, channelVisible.gyro);
-  filtLinAccScale =computeScale(filtLinAccChans,channelVisible.linacc);
-  filtOrientScale =computeScale(filtOrientChans,channelVisible.orient);
+  if (rawT0>1e9) tFactor=1/1000; else if (rawT0<1e4) tFactor=1000;
+
+  filtTimestamps   = rows.map(r => r.t * tFactor);
+  filtGyroChans    = [rows.map(r=>r.lpf_gx),   rows.map(r=>r.lpf_gy),     rows.map(r=>r.lpf_gz)];
+  filtAccelChans   = [rows.map(r=>r.ax),   rows.map(r=>r.ay),     rows.map(r=>r.az)];
+  filLpfAccChans  = [rows.map(r=>r.lpf_ax),rows.map(r=>r.lpf_ay),rows.map(r=>r.lpf_az)];
+  filtOrientChans  = [rows.map(r=>r.roll),  rows.map(r=>r.pitch),  rows.map(r=>r.yaw)];
+
+  const hasJ = rows[0].jx !== undefined && rows[0].jx !== '';
+  if (hasJ) {
+    filtJerkChans = [rows.map(r=>r.jx), rows.map(r=>r.jy), rows.map(r=>r.jz)];
+    filtJerkScale = computeScale(filtJerkChans, channelVisible.jerk);
+  } else {
+    filtJerkChans = [[], [], []];
+    filtJerkScale = null;
+  }
+  hasJerk = hasJ;
+
+  filtAccelScale  = computeScale(filtAccelChans,  channelVisible.accel);
+  filtGyroScale   = computeScale(filtGyroChans,   channelVisible.gyro);
+  filtLpfAccScale = computeScale(filLpfAccChans,  channelVisible.accel);
+  filtOrientScale = computeScale(filtOrientChans,  channelVisible.orient);
   return true;
 }
 
@@ -1477,32 +1548,37 @@ async function loadSession(s,el) {
   el.classList.add('active');
   document.getElementById('loading').classList.add('show');
 
-  autoScaleChart={accel:false,gyro:false,linacc:false,orient:false,gpsspeed:false};
-  ['accel','gyro','linacc','orient'].forEach(name=>{
+  autoScaleChart = {accel:false,gyro:false,lpfacc:false,orient:false,jerk:false,gpsspeed:false};
+  ['accel','gyro','lpfacc','orient','jerk'].forEach(name=>{
     channelVisible[name]=[true,true,true];
     for(let i=0;i<3;i++){const btn=document.getElementById(`ch-${name}-${i}`);if(btn)btn.classList.add('active');}
   });
+  hasJerk=false; accelMode='filtered';
 
   try {
     if(!s.imu)throw new Error('No IMU data');
     imuData=await fetchCSV(s.imu); if(!imuData.length)throw new Error('IMU CSV empty');
     minTs=imuData[0].timestamp_ms; maxTs=imuData[imuData.length-1].timestamp_ms;
-    timestamps  =imuData.map(r=>r.timestamp_ms);
-    accelChans  =[imuData.map(r=>r.accel_x),imuData.map(r=>r.accel_y),imuData.map(r=>r.accel_z)];
-    gyroChans   =[imuData.map(r=>r.gyro_x), imuData.map(r=>r.gyro_y), imuData.map(r=>r.gyro_z)];
-    accelScale  =computeScale(accelChans); gyroScale=computeScale(gyroChans);
+    timestamps  = imuData.map(r=>r.timestamp_ms);
+    accelChans  = [imuData.map(r=>r.accel_x),imuData.map(r=>r.accel_y),imuData.map(r=>r.accel_z)];
+    gyroChans   = [imuData.map(r=>r.gyro_x), imuData.map(r=>r.gyro_y), imuData.map(r=>r.gyro_z)];
+    accelScale  = computeScale(accelChans); gyroScale=computeScale(gyroChans);
+
+    filtTimestamps=[];filtAccelChans=[[],[],[]];filtGyroChans=[[],[],[]];
+    filLpfAccChans=[[],[],[]];filtOrientChans=[[],[],[]];
+    filtJerkChans=[[],[],[]];
+    filtAccelScale=filtGyroScale=filtLpfAccScale=filtOrientScale=filtJerkScale=null;
 
     hasFiltered=false;
-    filtTimestamps=[];filtAccelChans=[[],[],[]];filtGyroChans=[[],[],[]];
-    filtLinAccChans=[[],[],[]];filtOrientChans=[[],[],[]];
-    filtAccelScale=filtGyroScale=filtLinAccScale=filtOrientScale=null;
-
-    if(s.imu_filtered){const fData=await fetchCSV(s.imu_filtered);if(fData.length)hasFiltered=parseFilteredIMU(fData);}
+    if (s.imu_filtered) {
+      const fData=await fetchCSV(s.imu_filtered);
+      if (fData.length) hasFiltered=parseFilteredIMU(fData);
+    }
 
     document.getElementById('src-filtered').disabled=!hasFiltered;
-    setImuSource('raw'); accelMode='filtered';
+    setImuSource('raw');
 
-    viewOffsetMs=minTs;autoFollow=true;
+    viewOffsetMs=minTs; autoFollow=true;
     windowMs=(maxTs-minTs)<=12000?0:10000;
     document.getElementById('zoom-sel').value=windowMs===0?'0':String(windowMs);
 

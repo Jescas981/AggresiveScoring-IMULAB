@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Driving Score Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Azeret+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Barlow+Condensed:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #060810; --s1: #0b0f18; --s2: #101624; --s3: #17202f;
+  --border: #1d2a3d; --border2: #273550; --text: #bec8de; --dim: #56698a;
+  --muted: #28364d; --amber: #f59e0b; --white: #e8eef8;
+  --mono: 'Azeret Mono', monospace; --cond: 'Barlow Condensed', sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--mono);font-size:12px}
+
+header {
+  height: 40px; background: var(--s1); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px; padding: 0 14px; flex-shrink: 0;
+}
+.logo { font-family: var(--cond); font-size: 14px; font-weight: 800; letter-spacing: 3px; color: var(--amber); text-transform: uppercase; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.status-dot.live { background: #4ade80; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.2} }
+.header-info { font-size: 8px; color: var(--dim); flex:1; display:flex; gap:14px; }
+.header-info span { color: var(--text); font-weight: 600; }
+
+.app-body { display: flex; height: calc(100vh - 40px); overflow: hidden; }
+
+/* ── Main Content ── */
+.main-content { flex: 1; display: flex; overflow: hidden; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LEFT PANEL: Camera + IMU (Auxiliary) - Más pequeño
+   ═══════════════════════════════════════════════════════════════════════════ */
+.left-panel {
+  width: 280px; flex-shrink: 0; display: flex; flex-direction: column;
+  border-right: 1px solid var(--border); background: var(--s1);
+}
+
+/* Camera Feed - Pequeña, en la parte superior */
+.camera-mini {
+  flex: 0 0 160px; display: flex; flex-direction: column;
+  border-bottom: 1px solid var(--border);
+}
+.camera-mini-header {
+  padding: 4px 8px; font-size: 7px; text-transform: uppercase;
+  letter-spacing: 2px; color: var(--dim); background: var(--s2);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.camera-mini-feed {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; position: relative; background: #000; min-height: 0;
+}
+.camera-mini-feed img {
+  width: 100%; height: 100%; object-fit: contain;
+}
+.camera-no-signal {
+  color: var(--muted); font-size: 7px; text-transform: uppercase;
+  letter-spacing: 2px; position: absolute;
+}
+
+/* IMU Mini Charts - Compactas, 3 filas x 2 columnas */
+.imu-compact {
+  flex: 1; display: flex; flex-direction: column; min-height: 0;
+}
+.imu-compact-row {
+  flex: 1; display: flex; border-bottom: 1px solid var(--border);
+}
+.imu-compact-row:last-child { border-bottom: none; }
+.imu-compact-chart {
+  flex: 1; position: relative; overflow: hidden; min-width: 0;
+  border-right: 1px solid var(--border); background: var(--bg);
+}
+.imu-compact-chart:last-child { border-right: none; }
+.imu-compact-chart canvas { display: block; width: 100% !important; height: 100% !important; }
+.imu-compact-label {
+  position: absolute; top: 2px; left: 4px; font-size: 6px; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--dim); pointer-events: none; z-index: 2;
+}
+.imu-compact-val {
+  position: absolute; bottom: 2px; right: 4px; font-size: 6px;
+  color: var(--text); pointer-events: none; z-index: 2;
+  background: rgba(6,8,16,0.7); padding: 1px 3px; border-radius: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CENTER: SCORE & TIMELINE (PROTAGONISTA) - Mucho más grande
+   ═══════════════════════════════════════════════════════════════════════════ */
+.center-panel {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  border-right: 1px solid var(--border); min-width: 0;
+}
+
+/* Hero Score Area - Grande e imponente */
+.score-hero-large {
+  flex: 0 0 200px; display: flex; align-items: center; justify-content: center;
+  gap: 40px; padding: 20px;
+  background: radial-gradient(ellipse at 50% 50%, #0d1525 0%, var(--s1) 70%);
+  border-bottom: 1px solid var(--border);
+}
+.score-circle-large {
+  width: 160px; height: 160px; border-radius: 50%; position: relative;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  border: 4px solid var(--border2);
+  background: conic-gradient(
+    var(--score-color, #4ade80) calc(var(--score-pct, 0) * 1%),
+    transparent calc(var(--score-pct, 0) * 1%)
+  );
+  box-shadow: 0 0 60px rgba(0,0,0,0.5), inset 0 0 30px rgba(0,0,0,0.3);
+  transition: background 0.5s;
+}
+.score-inner-large {
+  width: 130px; height: 130px; border-radius: 50%;
+  background: var(--s1); display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.score-number-large {
+  font-family: var(--cond); font-size: 56px; font-weight: 900;
+  color: var(--score-color, #4ade80); line-height: 1;
+  transition: color 0.5s;
+}
+.score-label-large {
+  font-size: 8px; text-transform: uppercase; letter-spacing: 3px; color: var(--dim);
+  margin-top: 2px;
+}
+.score-grade-large {
+  font-family: var(--cond); font-size: 14px; font-weight: 700;
+  letter-spacing: 3px; text-transform: uppercase;
+  color: var(--score-color, #4ade80); transition: color 0.5s;
+}
+
+/* Score info al lado */
+.score-details {
+  display: flex; flex-direction: column; gap: 12px;
+}
+.score-detail-row {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.score-detail-label {
+  font-size: 7px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim);
+}
+.score-detail-val {
+  font-family: var(--cond); font-size: 28px; font-weight: 700;
+}
+.score-detail-sub {
+  font-size: 8px; color: var(--muted);
+}
+
+/* Scale bar grande */
+.scale-large {
+  margin-top: 8px; width: 100%;
+}
+.scale-bar-large {
+  display: flex; height: 6px; border-radius: 3px; overflow: hidden;
+}
+.scale-seg { flex: 1; }
+.scale-labels-large {
+  display: flex; justify-content: space-between; font-size: 6px;
+  color: var(--dim); margin-top: 4px; letter-spacing: 1px;
+}
+
+/* Live chips */
+.live-chips-row {
+  flex: 0 0 24px; display: flex; align-items: center; gap: 8px;
+  padding: 0 10px; background: var(--s1); border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.live-chip {
+  display: flex; align-items: center; gap: 3px; font-size: 7px; white-space: nowrap;
+}
+.live-chip-key { font-weight: 600; }
+.live-chip-val { font-variant-numeric: tabular-nums; }
+
+/* Event Timeline - MÁS GRANDE, el protagonista */
+.event-timeline-hero {
+  flex: 1; position: relative; overflow: hidden; min-height: 0; background: var(--bg);
+}
+.event-timeline-hero canvas { display: block; width: 100% !important; height: 100% !important; }
+.timeline-header {
+  position: absolute; top: 8px; left: 12px; font-size: 8px; text-transform: uppercase;
+  letter-spacing: 2px; color: var(--dim); pointer-events: none; z-index: 2;
+}
+.timeline-legend {
+  position: absolute; top: 8px; right: 12px; display: flex; gap: 8px;
+  font-size: 6px; color: var(--dim); pointer-events: none; z-index: 2;
+}
+.timeline-legend span { display: flex; align-items: center; gap: 3px; }
+.timeline-legend-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RIGHT PANEL: Events - Mantenido
+   ═══════════════════════════════════════════════════════════════════════════ */
+.right-panel {
+  width: 260px; flex-shrink: 0; background: var(--s1);
+  overflow-y: auto; display: flex; flex-direction: column;
+}
+.panel-section { padding: 10px; border-bottom: 1px solid var(--border); }
+.panel-title { font-size: 7px; text-transform: uppercase; letter-spacing: 3px; color: var(--dim); margin-bottom: 8px; }
+
+.event-card {
+  background: var(--s2); border: 1px solid var(--border); padding: 8px;
+  margin-bottom: 5px; border-left: 3px solid var(--amber);
+  transition: transform 0.15s;
+}
+.event-card:hover { transform: translateX(2px); }
+.event-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.event-type { font-size: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+.event-score-badge { font-family: var(--cond); font-size: 20px; font-weight: 800; line-height: 1; }
+.event-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3px; margin-top: 4px; }
+.metric { text-align: center; }
+.metric-val { font-size: 9px; font-weight: 600; }
+.metric-lbl { font-size: 5px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
+
+.events-list { flex: 1; overflow-y: auto; }
+.events-list::-webkit-scrollbar { width: 3px; }
+.events-list::-webkit-scrollbar-thumb { background: var(--border2); }
+.empty-state { text-align: center; padding: 20px; color: var(--muted); font-size: 8px; text-transform: uppercase; letter-spacing: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⬡ Drive Score</div>
+  <div class="status-dot" id="status-dot"></div>
+  <div class="header-info">
+    <div>IMU: <span id="hdr-packets">0</span></div>
+    <div>Events: <span id="hdr-events">0</span></div>
+    <div>Score: <span id="hdr-score">--</span></div>
+  </div>
+</header>
+
+<div class="app-body">
+  <div class="main-content">
+    
+    <!-- ═══ LEFT: Camera + IMU (Auxiliar) ═══ -->
+    <div class="left-panel">
+      <!-- Camera Mini -->
+      <div class="camera-mini">
+        <div class="camera-mini-header">
+          <span>📹 Camera</span>
+          <span id="camera-fps" style="color:#4ade80;">-- fps</span>
+        </div>
+        <div class="camera-mini-feed">
+          <div class="camera-no-signal" id="camera-no-signal">No Signal</div>
+          <img id="camera-img" style="display:none;" alt="Camera Feed">
+        </div>
+      </div>
+
+      <!-- IMU Compact Charts - 3 rows x 2 cols -->
+      <div class="imu-compact">
+        <div class="imu-compact-row">
+          <div class="imu-compact-chart">
+            <div class="imu-compact-label" style="color:#38bdf8;">Accel X</div>
+            <div class="imu-compact-val" id="mv-ax" style="color:#38bdf8;">—</div>
+            <canvas id="cv-ax"></canvas>
+          </div>
+          <div class="imu-compact-chart">
+            <div class="imu-compact-label" style="color:#34d399;">Accel Y</div>
+            <div class="imu-compact-val" id="mv-ay" style="color:#34d399;">—</div>
+            <canvas id="cv-ay"></canvas>
+          </div>
+        </div>
+        <div class="imu-compact-row">
+          <div class="imu-compact-chart">
+            <div class="imu-compact-label" style="color:#f87171;">Accel Z</div>
+            <div class="imu-compact-val" id="mv-az" style="color:#f87171;">—</div>
+            <canvas id="cv-az"></canvas>
+          </div>
+          <div class="imu-compact-chart">
+            <div class="imu-compact-label" style="color:#fbbf24;">Gyro X</div>
+            <div class="imu-compact-val" id="mv-gx" style="color:#fbbf24;">—</div>
+            <canvas id="cv-gx"></canvas>
+          </div>
+        </div>
+        <div class="imu-compact-row">
+          <div class="imu-compact-chart">
+            <div class="imu-compact-label" style="color:#a78bfa;">Gyro Y</div>
+            <div class="imu-compact-val" id="mv-gy" style="color:#a78bfa;">—</div>
+            <canvas id="cv-gy"></canvas>
+          </div>
+          <div class="imu-compact-chart">
+            <div class="imu-compact-label" style="color:#fb923c;">Gyro Z</div>
+            <div class="imu-compact-val" id="mv-gz" style="color:#fb923c;">—</div>
+            <canvas id="cv-gz"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ CENTER: Score Hero + Timeline (PROTAGONISTA) ═══ -->
+    <div class="center-panel">
+      <!-- Hero Score Area -->
+      <div class="score-hero-large">
+        <div class="score-circle-large" id="score-circle">
+          <div class="score-inner-large">
+            <div class="score-number-large" id="score-number">--</div>
+            <div class="score-label-large">DRIVING SCORE</div>
+            <div class="score-grade-large" id="score-grade">--</div>
+          </div>
+        </div>
+        <div class="score-details">
+          <div class="score-detail-row">
+            <span class="score-detail-label">Total Events</span>
+            <span class="score-detail-val" id="sd-events" style="color:var(--amber);">0</span>
+            <span class="score-detail-sub" id="sd-event-types">—</span>
+          </div>
+          <div class="score-detail-row">
+            <span class="score-detail-label">Last Event Score</span>
+            <span class="score-detail-val" id="sd-last" style="color:var(--dim);">--</span>
+            <span class="score-detail-sub" id="sd-last-name">—</span>
+          </div>
+          <div class="score-detail-row">
+            <span class="score-detail-label">IMU Packets</span>
+            <span class="score-detail-val" id="sd-packets" style="color:#56698a;">0</span>
+          </div>
+          <div class="scale-large">
+            <div class="scale-bar-large">
+              <div class="scale-seg" style="background:#4ade80;"></div>
+              <div class="scale-seg" style="background:#a3e635;"></div>
+              <div class="scale-seg" style="background:#fbbf24;"></div>
+              <div class="scale-seg" style="background:#fb923c;"></div>
+              <div class="scale-seg" style="background:#f87171;"></div>
+            </div>
+            <div class="scale-labels-large">
+              <span>SAFE</span><span>NORMAL</span><span>FAIR</span><span>AGGRESSIVE</span><span>DANGER</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Chips Row -->
+      <div class="live-chips-row" id="live-chips-row"></div>
+
+      <!-- Event Timeline - El protagonista, ocupa todo el espacio restante -->
+      <div class="event-timeline-hero">
+        <div class="timeline-header">⬡ EVENT TIMELINE · DRIVING SCORE</div>
+        <div class="timeline-legend">
+          <span><span class="timeline-legend-dot" style="background:#4ade80;"></span> Safe</span>
+          <span><span class="timeline-legend-dot" style="background:#fbbf24;"></span> Fair</span>
+          <span><span class="timeline-legend-dot" style="background:#f87171;"></span> Danger</span>
+        </div>
+        <canvas id="cv-timeline"></canvas>
+      </div>
+    </div>
+
+    <!-- ═══ RIGHT: Event Cards ═══ -->
+    <div class="right-panel">
+      <div class="panel-section">
+        <div class="panel-title">Last Event Details</div>
+        <div id="last-event-container">
+          <div class="empty-state">Waiting for events...</div>
+        </div>
+      </div>
+      <div class="panel-section" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+        <div class="panel-title">Event History</div>
+        <div class="events-list" id="events-list">
+          <div class="empty-state">No events recorded</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Score Colors ───────────────────────────────────────────────────────────
+function scoreHex(v) {
+  if (v <= 20) return '#4ade80';
+  if (v <= 40) return '#a3e635';
+  if (v <= 60) return '#fbbf24';
+  if (v <= 80) return '#fb923c';
+  return '#f87171';
+}
+function scoreGrade(v) {
+  if (v <= 20) return 'Excellent';
+  if (v <= 40) return 'Good';
+  if (v <= 60) return 'Fair';
+  if (v <= 80) return 'Aggressive';
+  return 'Dangerous';
+}
+
+// ── Mini chart colors ──────────────────────────────────────────────────────
+const CHANNEL_COLORS = {
+  ax: '#38bdf8', ay: '#34d399', az: '#f87171',
+  gx: '#fbbf24', gy: '#a78bfa', gz: '#fb923c'
+};
+
+// ── Canvas references ──────────────────────────────────────────────────────
+const canvases = {};
+['ax','ay','az','gx','gy','gz'].forEach(k => {
+  canvases[k] = document.getElementById('cv-'+k);
+});
+const cvTimeline = document.getElementById('cv-timeline');
+const ctxTimeline = cvTimeline.getContext('2d');
+
+function resizeAll() {
+  Object.values(canvases).forEach(cv => {
+    const p = cv.parentElement;
+    if (p && p.clientWidth > 0 && p.clientHeight > 0) {
+      cv.width = p.clientWidth;
+      cv.height = p.clientHeight;
+    }
+  });
+  const tp = cvTimeline.parentElement;
+  if (tp && tp.clientWidth > 0 && tp.clientHeight > 0) {
+    cvTimeline.width = tp.clientWidth;
+    cvTimeline.height = tp.clientHeight;
+  }
+}
+window.addEventListener('resize', resizeAll);
+
+// ── Draw single channel mini chart ─────────────────────────────────────────
+function drawMiniChart(cv, data, key, W, H) {
+  const ctx = cv.getContext('2d');
+  if (!W || !H || W < 5 || H < 5) return;
+  
+  ctx.fillStyle = '#060810';
+  ctx.fillRect(0, 0, W, H);
+  
+  if (!data || data.length < 2) return;
+  
+  const color = CHANNEL_COLORS[key] || '#fff';
+  
+  // Find range
+  let mn = Infinity, mx = -Infinity;
+  data.forEach(d => {
+    if (d[key] < mn) mn = d[key];
+    if (d[key] > mx) mx = d[key];
+  });
+  const rng = (mx - mn) || 1;
+  const pad = rng * 0.1;
+  const rangeMn = mn - pad;
+  const rangeMx = mx + pad;
+  const rangeRng = rangeMx - rangeMn || 1;
+  
+  // Center line
+  ctx.strokeStyle = '#111d2e';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(0, H/2);
+  ctx.lineTo(W, H/2);
+  ctx.stroke();
+  
+  // Draw signal
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  data.forEach((d, j) => {
+    const x = (j / Math.max(data.length - 1, 1)) * W;
+    const y = H - ((d[key] - rangeMn) / rangeRng) * H;
+    if (j === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  
+  // Update value
+  const last = data[data.length - 1];
+  if (last) {
+    document.getElementById('mv-' + key).textContent = last[key]?.toFixed(2) || '—';
+  }
+}
+
+// ── Draw Event Timeline (PROTAGONISTA - Más grande y detallado) ────────────
+function drawTimeline(events, W, H) {
+  if (!W || !H || W < 10 || H < 10) return;
+  
+  const margin = { top: 30, right: 20, bottom: 30, left: 45 };
+  const plotW = W - margin.left - margin.right;
+  const plotH = H - margin.top - margin.bottom;
+  
+  // Background
+  ctxTimeline.fillStyle = '#060810';
+  ctxTimeline.fillRect(0, 0, W, H);
+  
+  // Plot area background
+  ctxTimeline.fillStyle = '#080c18';
+  ctxTimeline.fillRect(margin.left, margin.top, plotW, plotH);
+  ctxTimeline.strokeStyle = '#1d2a3d';
+  ctxTimeline.lineWidth = 1;
+  ctxTimeline.strokeRect(margin.left, margin.top, plotW, plotH);
+  
+  if (!events || events.length === 0) {
+    ctxTimeline.fillStyle = '#28364d';
+    ctxTimeline.font = "12px 'Azeret Mono'";
+    ctxTimeline.textAlign = 'center';
+    ctxTimeline.fillText('Waiting for events...', W/2, H/2);
+    return;
+  }
+  
+  // Grid lines (horizontal for score %, vertical for time)
+  ctxTimeline.strokeStyle = '#111d2e';
+  ctxTimeline.lineWidth = 0.5;
+  for (let i = 0; i <= 5; i++) {
+    const y = margin.top + (plotH * i) / 5;
+    ctxTimeline.beginPath(); ctxTimeline.moveTo(margin.left, y); ctxTimeline.lineTo(margin.left + plotW, y); ctxTimeline.stroke();
+    
+    // Y-axis labels
+    ctxTimeline.fillStyle = i === 0 ? '#4ade80' : i === 5 ? '#f87171' : '#56698a';
+    ctxTimeline.font = "8px 'Azeret Mono'";
+    ctxTimeline.textAlign = 'right';
+    ctxTimeline.fillText((100 - i * 20) + ' ', margin.left - 8, y + 3);
+  }
+  
+  // Time range
+  const tMin = events[0].ts;
+  const tMax = events[events.length - 1].ts;
+  const tRange = (tMax - tMin) || 1000;
+  
+  // Draw filled area under events
+  ctxTimeline.fillStyle = '#4ade8011';
+  ctxTimeline.beginPath();
+  ctxTimeline.moveTo(margin.left, margin.top + plotH);
+  events.forEach(e => {
+    const x = margin.left + ((e.ts - tMin) / tRange) * plotW;
+    const sp = e.score_pct || 0;
+    const y = margin.top + plotH - (sp / 100) * plotH;
+    ctxTimeline.lineTo(x, y);
+  });
+  ctxTimeline.lineTo(margin.left + plotW, margin.top + plotH);
+  ctxTimeline.closePath();
+  ctxTimeline.fill();
+  
+  // Draw gradient area (safe to danger)
+  const gradient = ctxTimeline.createLinearGradient(0, margin.top, 0, margin.top + plotH);
+  gradient.addColorStop(0, '#f8717133');
+  gradient.addColorStop(0.5, '#fbbf2433');
+  gradient.addColorStop(1, '#4ade8033');
+  ctxTimeline.fillStyle = gradient;
+  ctxTimeline.beginPath();
+  ctxTimeline.moveTo(margin.left, margin.top);
+  events.forEach(e => {
+    const x = margin.left + ((e.ts - tMin) / tRange) * plotW;
+    const sp = e.score_pct || 0;
+    const y = margin.top + plotH - (sp / 100) * plotH;
+    ctxTimeline.lineTo(x, y);
+  });
+  ctxTimeline.lineTo(margin.left + plotW, margin.top);
+  ctxTimeline.closePath();
+  ctxTimeline.fill();
+  
+  // Draw connecting line
+  ctxTimeline.strokeStyle = '#bec8de88';
+  ctxTimeline.lineWidth = 2;
+  ctxTimeline.beginPath();
+  events.forEach((e, i) => {
+    const x = margin.left + ((e.ts - tMin) / tRange) * plotW;
+    const sp = e.score_pct || 0;
+    const y = margin.top + plotH - (sp / 100) * plotH;
+    if (i === 0) ctxTimeline.moveTo(x, y);
+    else ctxTimeline.lineTo(x, y);
+  });
+  ctxTimeline.stroke();
+  
+  // Draw event dots (más grandes para ser protagonistas)
+  events.forEach(e => {
+    const x = margin.left + ((e.ts - tMin) / tRange) * plotW;
+    const sp = e.score_pct || 0;
+    const y = margin.top + plotH - (sp / 100) * plotH;
+    const color = scoreHex(sp);
+    const radius = 5;
+    
+    // Outer glow
+    ctxTimeline.fillStyle = color + '44';
+    ctxTimeline.beginPath();
+    ctxTimeline.arc(x, y, radius + 3, 0, Math.PI * 2);
+    ctxTimeline.fill();
+    
+    // Main dot
+    ctxTimeline.fillStyle = color;
+    ctxTimeline.beginPath();
+    ctxTimeline.arc(x, y, radius, 0, Math.PI * 2);
+    ctxTimeline.fill();
+    ctxTimeline.strokeStyle = '#060810';
+    ctxTimeline.lineWidth = 2;
+    ctxTimeline.stroke();
+    
+    // Score label on hover area (show for last 3 events)
+    if (e === events[events.length - 1] || e === events[events.length - 2] || e === events[events.length - 3]) {
+      ctxTimeline.fillStyle = '#e8eef8';
+      ctxTimeline.font = "bold 8px 'Barlow Condensed'";
+      ctxTimeline.textAlign = 'center';
+      ctxTimeline.fillText(sp.toFixed(1), x, y - 12);
+    }
+  });
+  
+  // X-axis labels (time)
+  ctxTimeline.fillStyle = '#56698a';
+  ctxTimeline.font = "7px 'Azeret Mono'";
+  ctxTimeline.textAlign = 'center';
+  const timeSteps = 4;
+  for (let i = 0; i <= timeSteps; i++) {
+    const x = margin.left + (plotW * i) / timeSteps;
+    const t = tMin + (tRange * i) / timeSteps;
+    const d = new Date(t * 1000);
+    const label = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    ctxTimeline.fillText(label, x, margin.top + plotH + 16);
+    ctxTimeline.strokeStyle = '#1d2a3d';
+    ctxTimeline.lineWidth = 0.5;
+    ctxTimeline.beginPath();
+    ctxTimeline.moveTo(x, margin.top);
+    ctxTimeline.lineTo(x, margin.top + plotH);
+    ctxTimeline.stroke();
+  }
+  
+  // Title
+  ctxTimeline.fillStyle = '#e8eef8';
+  ctxTimeline.font = "bold 10px 'Barlow Condensed'";
+  ctxTimeline.textAlign = 'left';
+  ctxTimeline.fillText(`Events: ${events.length}`, margin.left, margin.top - 10);
+}
+
+// ── Camera ──────────────────────────────────────────────────────────────────
+let lastFrameTime = 0;
+
+function startCameraStream() {
+  const img = document.getElementById('camera-img');
+  const noSignal = document.getElementById('camera-no-signal');
+  
+  img.src = '/video_feed';
+  img.onload = () => {
+    img.style.display = 'block';
+    noSignal.style.display = 'none';
+    const now = performance.now();
+    if (lastFrameTime) {
+      const fps = Math.round(1000 / (now - lastFrameTime));
+      document.getElementById('camera-fps').textContent = fps + ' fps';
+    }
+    lastFrameTime = now;
+  };
+  img.onerror = () => {
+    setInterval(async () => {
+      try {
+        const resp = await fetch('/api/frame');
+        const data = await resp.json();
+        if (data.frame) {
+          img.src = data.frame;
+          img.style.display = 'block';
+          noSignal.style.display = 'none';
+        }
+      } catch(e) {}
+    }, 200);
+  };
+}
+
+// ── UI Updates ─────────────────────────────────────────────────────────────
+function updateScoreDisplay(scorePct) {
+  const color = scoreHex(scorePct);
+  document.getElementById('score-number').textContent = scorePct?.toFixed(1) || '--';
+  document.getElementById('score-number').style.color = color;
+  document.getElementById('score-grade').textContent = scoreGrade(scorePct);
+  document.getElementById('score-grade').style.color = color;
+  document.getElementById('hdr-score').textContent = scorePct?.toFixed(1) || '--';
+  document.getElementById('hdr-score').style.color = color;
+  const circle = document.getElementById('score-circle');
+  circle.style.setProperty('--score-pct', scorePct || 0);
+  circle.style.setProperty('--score-color', color);
+}
+
+function updateLastEvent(event) {
+  const container = document.getElementById('last-event-container');
+  if (!event) {
+    container.innerHTML = '<div class="empty-state">Waiting for events...</div>';
+    document.getElementById('sd-last').textContent = '--';
+    document.getElementById('sd-last-name').textContent = '—';
+    return;
+  }
+  const sp = event.score_pct || 0;
+  const color = scoreHex(sp);
+  container.innerHTML = `
+    <div class="event-card" style="border-left-color:${color}">
+      <div class="event-card-header">
+        <span class="event-type" style="color:${color}">${event.event_name}</span>
+      </div>
+      <div class="event-score-badge" style="color:${color}">${sp.toFixed(1)}</div>
+      <div class="event-metrics">
+        <div class="metric"><div class="metric-val" style="color:#38bdf8">${event.peak_ax?.toFixed(2)}</div><div class="metric-lbl">Peak</div></div>
+        <div class="metric"><div class="metric-val" style="color:#fbbf24">${event.jerk?.toFixed(2)}</div><div class="metric-lbl">Jerk</div></div>
+        <div class="metric"><div class="metric-val" style="color:#a78bfa">${event.rms?.toFixed(2)}</div><div class="metric-lbl">RMS</div></div>
+      </div>
+    </div>`;
+  document.getElementById('sd-last').textContent = sp.toFixed(1);
+  document.getElementById('sd-last').style.color = color;
+  document.getElementById('sd-last-name').textContent = event.event_name || '—';
+}
+
+function updateSessionScore(session) {
+  if (!session) return;
+  const sp = session.score_pct || 0;
+  updateScoreDisplay(sp);
+  const totalEvents = (session.n_frenado||0)+(session.n_giro||0)+(session.n_rompemuelle||0);
+  document.getElementById('sd-events').textContent = totalEvents;
+  const types = [];
+  if (session.n_frenado) types.push(`${session.n_frenado} Braking`);
+  if (session.n_giro) types.push(`${session.n_giro} Turns`);
+  if (session.n_rompemuelle) types.push(`${session.n_rompemuelle} Bumps`);
+  document.getElementById('sd-event-types').textContent = types.join(' · ') || '—';
+}
+
+function updateEventsList(events) {
+  const container = document.getElementById('events-list');
+  if (!events || !events.length) {
+    container.innerHTML = '<div class="empty-state">No events recorded</div>';
+    return;
+  }
+  container.innerHTML = events.slice(-15).reverse().map(e => {
+    const sp = e.score_pct || 0;
+    const color = scoreHex(sp);
+    return `
+      <div class="event-card" style="border-left-color:${color}">
+        <div class="event-card-header">
+          <span class="event-type" style="color:${color}">${e.event_name}</span>
+        </div>
+        <div class="event-score-badge" style="color:${color}">${sp.toFixed(1)}</div>
+        <div class="event-metrics">
+          <div class="metric"><div class="metric-val" style="color:#38bdf8">${e.peak_ax?.toFixed(1)}</div><div class="metric-lbl">Peak</div></div>
+          <div class="metric"><div class="metric-val" style="color:#fbbf24">${e.jerk?.toFixed(1)}</div><div class="metric-lbl">Jerk</div></div>
+          <div class="metric"><div class="metric-val" style="color:#a78bfa">${e.rms?.toFixed(1)}</div><div class="metric-lbl">RMS</div></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function updateLiveValuesRow(data) {
+  if (!data || !data.length) return;
+  const last = data[data.length-1];
+  const row = document.getElementById('live-chips-row');
+  const keys = [
+    {k:'ax',c:'#38bdf8'},{k:'ay',c:'#34d399'},{k:'az',c:'#f87171'},
+    {k:'gx',c:'#fbbf24'},{k:'gy',c:'#a78bfa'},{k:'gz',c:'#fb923c'}
+  ];
+  row.innerHTML = keys.map(({k,c}) => 
+    `<div class="live-chip"><span class="live-chip-key" style="color:${c}">${k.toUpperCase()}</span><span class="live-chip-val" style="color:${c}">${last[k]?.toFixed(2)||'—'}</span></div>`
+  ).join('');
+}
+
+// ── Main Loop ──────────────────────────────────────────────────────────────
+async function fetchData() {
+  try {
+    const resp = await fetch('/api/live');
+    const data = await resp.json();
+    
+    document.getElementById('hdr-packets').textContent = data.packet_count || 0;
+    document.getElementById('hdr-events').textContent = data.event_count || 0;
+    document.getElementById('sd-packets').textContent = data.packet_count || 0;
+    
+    const dot = document.getElementById('status-dot');
+    data.mean?.length > 0 ? dot.classList.add('live') : dot.classList.remove('live');
+    
+    resizeAll();
+    const imuData = data.mean || [];
+    
+    if (imuData.length >= 2) {
+      Object.keys(canvases).forEach(key => {
+        const cv = canvases[key];
+        drawMiniChart(cv, imuData, key, cv.width, cv.height);
+      });
+      updateLiveValuesRow(imuData);
+    }
+    
+    // Timeline - EL PROTAGONISTA
+    if (data.events && data.events.length > 0) {
+      drawTimeline(data.events, cvTimeline.width, cvTimeline.height);
+    }
+    
+    updateLastEvent(data.last_event);
+    updateSessionScore(data.last_session);
+    updateEventsList(data.events || []);
+  } catch(err) { console.error('Fetch error:', err); }
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+resizeAll();
+startCameraStream();
+fetchData();
+setInterval(fetchData, 50);
+</script>
+</body>
+</html>
