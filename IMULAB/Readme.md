@@ -1,4 +1,7 @@
-# ⬡ IMU Lab - IMU Data Playback & Labeling Tool
+# Embeed - Code ready to be uploaded on microcontroller
+
+
+# IMU Lab - IMU Data Playback & Labeling Tool
 
 A powerful web-based visualization and labeling tool for Inertial Measurement Unit (IMU) data, featuring synchronized multi-axis signal charts, GPS trail visualization, video frame playback, and an intuitive labeling system for driving event annotation.
 
@@ -96,30 +99,6 @@ data/
     └── [session_id]/
         ├── imu.csv # Raw IMU data
         ├── filtered_imu.csv # Filtered IMU data (optional)
-        ├── gps.csv # GPS trajectory data (optional)
-        ├── frame_timestamps.csv # Video frame index (optional)
-        └── frames/ # Video frame images (optional)
-            ├── 000001.png
-            ├── 000002.png
-            └── ...
+        ├── gps.csv # GPS trajectory data
+        ├── frame_timestamps.csv # Video frame index
 ```
-
-### IMU CSV Format
-```csv
-timestamp_ms,accel_x,accel_y,accel_z,gyro_x,gyro_y,gyro_z
-0.0,0.12,-9.81,0.34,0.001,-0.002,0.000
-10.0,0.15,-9.78,0.31,0.002,-0.001,0.001
-...
-
-t,gx,gy,gz,ax,ay,az,alin_x,alin_y,alin_z,roll,pitch,yaw
-0.0,0.001,-0.002,0.000,0.12,-9.81,0.34,0.10,-0.15,0.20,0.01,0.05,-0.02
-...
-
-timestamp_ms,latitude,longitude,speed_mps,altitude_m
-0.0,37.7749,-122.4194,15.2,10.5
-...
-
-frame_idx,timestamp_ms
-1,0.0
-2,33.3
-...
