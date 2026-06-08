@@ -1,510 +1,387 @@
-# run_benchmark.py
 import serial
 import numpy as np
-import pandas as pd
 import os
-import glob
 import time
-from datetime import datetime
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, classification_report
+import struct
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# =========================================================
-# CONFIGURACIÓN DE RUTAS
-# =========================================================
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix
+)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATASET_BASE_DIR = os.path.join(BASE_DIR, "model_input", "datasets")
-EXPORT_DIR = os.path.join(BASE_DIR, f"benchmark_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
-
+# =========================================================
+# CONFIG
+# =========================================================
 PORT = "/dev/ttyACM0"
 BAUDRATE = 115200
 
-print(f"📁 Base directory: {BASE_DIR}")
-print(f"📁 Datasets directory: {DATASET_BASE_DIR}")
-print(f"📁 Existe: {os.path.exists(DATASET_BASE_DIR)}")
+MAGIC = 0xAA
 
-# =========================================================
-# MAPEO DE MODELOS A SUS DATASETS DE PRUEBA
-# =========================================================
+CMD_INFO = 0x01
+CMD_DATA = 0x02
 
-MODEL_DATASETS = {
-    "FULL_IMU_LPF_RF":      "FULL_IMU_LPF_RF/validation_dataset.csv",
-    "SELECTED_IMU_RF":      "SELECTED_IMU_RF/validation_dataset.csv",
-    "SELECTED_GPS_RF":      "SELECTED_GPS_RF/validation_dataset.csv",
-    "IMU_WITH_GPS_RF":      "IMU_WITH_GPS_RF/validation_dataset.csv",
-    "FULL_IMU_GPS_RF":      "FULL_IMU_GPS_RF/validation_dataset.csv",
-
-    "FULL_IMU_LPF_XGB":     "FULL_IMU_LPF_XGB/validation_dataset.csv",
-    "SELECTED_IMU_XGB":     "SELECTED_IMU_XGB/validation_dataset.csv",
-    "SELECTED_GPS_XGB":     "SELECTED_GPS_XGB/validation_dataset.csv",
-    "IMU_WITH_GPS_XGB":     "IMU_WITH_GPS_XGB/validation_dataset.csv",
-    "FULL_IMU_GPS_XGB":     "FULL_IMU_GPS_XGB/validation_dataset.csv",
-
-    "FULL_IMU_LPF_ANN_FEAT": "FULL_IMU_LPF_ANN_FEAT/validation_dataset.csv",
-    "SELECTED_IMU_ANN_FEAT": "SELECTED_IMU_ANN_FEAT/validation_dataset.csv",
-    "SELECTED_GPS_ANN_FEAT": "SELECTED_GPS_ANN_FEAT/validation_dataset.csv",
-    "IMU_WITH_GPS_ANN_FEAT": "IMU_WITH_GPS_ANN_FEAT/validation_dataset.csv",
-    "FULL_IMU_GPS_ANN_FEAT": "FULL_IMU_GPS_ANN_FEAT/validation_dataset.csv",
-}
+RESP_INFO = 0x11
+RESP_DATA = 0x12
+RESP_LOG  = 0x13
 
 
 # =========================================================
-# DETECCIÓN DE MODELO
+# REQUEST INFO
 # =========================================================
-
-def get_model_from_arduino(port=PORT, baud=BAUDRATE):
-    """Detecta el modelo actual desde Arduino enviando comando INFO"""
-    try:
-        ser = serial.Serial(port, baud, timeout=2)
-        time.sleep(2)
-        ser.reset_input_buffer()
-        ser.reset_output_buffer()
-
-        print("  Enviando INFO...")
-        ser.write(b"INFO\n")
-        ser.flush()
-        time.sleep(0.5)
-
-        model_name = None
-        board_info = {}
-        start = time.time()
-
-        while (time.time() - start) < 3:
-            if ser.in_waiting:
-                line = ser.readline().decode().strip()
-                if line:
-                    print(f"    Recibido: {line}")
-                if line.startswith("Model:"):
-                    model_name = line.replace("Model:", "").strip()
-                elif line.startswith("Features:"):
-                    board_info["features"] = line.replace("Features:", "").strip()
-                elif line.startswith("Classes:"):
-                    board_info["classes"] = line.replace("Classes:", "").strip()
-                elif line.startswith("Free RAM:"):
-                    board_info["free_ram"] = int(line.replace("Free RAM:", "").strip())
-                elif line.startswith("Min Free RAM:"):
-                    board_info["min_free_ram"] = int(line.replace("Min Free RAM:", "").strip())
-                elif line.startswith("Largest free block:"):
-                    board_info["largest_block"] = int(line.replace("Largest free block:", "").strip())
-                elif line == "READY":
-                    break
-            time.sleep(0.05)
-
-        ser.close()
-
-        if board_info:
-            print("\n  📋 Info del board:")
-            for k, v in board_info.items():
-                label = {
-                    "features":     "  Features",
-                    "classes":      "  Classes",
-                    "free_ram":     "  Free RAM",
-                    "min_free_ram": "  Min Free RAM (histórico)",
-                    "largest_block":"  Largest free block",
-                }.get(k, f"  {k}")
-                unit = " bytes" if "ram" in k or "block" in k else ""
-                print(f"{label}: {v}{unit}")
-
-        return model_name, board_info
-
-    except Exception as e:
-        print(f"  ❌ Error: {e}")
-        return None, {}
-
-
-def find_dataset_for_model(model_name):
-    """Encuentra el dataset correspondiente al modelo"""
-    if model_name in MODEL_DATASETS:
-        dataset_path = os.path.join(DATASET_BASE_DIR, MODEL_DATASETS[model_name])
-        if os.path.exists(dataset_path):
-            print(f"  ✅ Encontrado: {dataset_path}")
-            return dataset_path
-        else:
-            print(f"  ❌ No existe: {dataset_path}")
-
-    pattern = f"*{model_name}*.csv"
-    files = glob.glob(os.path.join(DATASET_BASE_DIR, pattern))
-    if files:
-        print(f"  ✅ Encontrado por patrón: {files[0]}")
-        return files[0]
-
-    print(f"  ❌ No se encontró dataset para {model_name}")
-    return None
-
-
-def list_available_datasets():
-    """Lista todos los datasets disponibles"""
-    csv_files = glob.glob(os.path.join(DATASET_BASE_DIR, "*dataset.csv"))
-    print("\n📂 Datasets disponibles:")
-    for f in csv_files:
-        name = os.path.basename(f)
-        for model, dataset in MODEL_DATASETS.items():
-            if dataset == name:
-                print(f"  {name} -> {model}")
-                break
-        else:
-            print(f"  {name}")
+def request_info(ser):
+    ser.reset_input_buffer()
+    ser.write(struct.pack("<BB", MAGIC, CMD_INFO))
+    ser.flush()
 
 
 # =========================================================
-# PLOTS
+# READ INFO PACKET
 # =========================================================
+def read_info(ser):
 
-def plot_confusion_matrix(y_true, y_pred, class_names, model_name, output_dir):
-    """Genera y guarda la matriz de confusión"""
-    cm = confusion_matrix(y_true, y_pred)
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-                xticklabels=class_names, yticklabels=class_names)
-    plt.title(f'Confusion Matrix - {model_name}')
-    plt.ylabel('True Label')
-    plt.xlabel('Predicted Label')
-    plt.tight_layout()
-    output_path = os.path.join(output_dir, f'confusion_matrix_{model_name}.png')
-    plt.savefig(output_path, dpi=150)
-    plt.show()
-    print(f"  📊 Confusion matrix saved: {output_path}")
-    return cm
+    while True:
+        b = ser.read(1)
 
+        if len(b) == 0:
+            return None
 
-def plot_ram_usage(df_ok, model_name, output_dir):
-    """
-    Genera dos gráficas de RAM:
-      1. RAM libre a lo largo de las inferencias
-      2. Histograma del delta de RAM por inferencia
-    """
-    if 'ram_antes' not in df_ok.columns or df_ok['ram_antes'].eq(-1).all():
-        print("  ⚠️  Sin datos de RAM (firmware antiguo o placa sin soporte)")
-        return
+        if b[0] == MAGIC:
+            break
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    fig.suptitle(f'RAM Usage During Inference - {model_name}', fontsize=13)
+    cmd = ser.read(1)
 
-    # ── Gráfica 1: RAM libre a lo largo del tiempo ──────────────────────────
-    axes[0].plot(df_ok['sample'], df_ok['ram_antes'], color='steelblue', linewidth=0.8)
-    axes[0].set_title('Free RAM per Inference')
-    axes[0].set_xlabel('Sample index')
-    axes[0].set_ylabel('Free RAM (bytes)')
-    axes[0].grid(True, alpha=0.3)
-
-    # ── Gráfica 2: Histograma de delta RAM ───────────────────────────────────
-    deltas = df_ok['ram_delta'].values
-    axes[1].hist(deltas, bins=30, color='salmon', edgecolor='white')
-    axes[1].axvline(0, color='black', linestyle='--', linewidth=1)
-    axes[1].set_title('RAM Delta per Inference\n(>0 = consumed, 0 = no alloc)')
-    axes[1].set_xlabel('RAM delta (bytes)')
-    axes[1].set_ylabel('Count')
-    axes[1].grid(True, alpha=0.3)
-
-    plt.tight_layout()
-    output_path = os.path.join(output_dir, f'ram_usage_{model_name}.png')
-    plt.savefig(output_path, dpi=150)
-    plt.show()
-    print(f"  📊 RAM plot saved: {output_path}")
-
-
-# =========================================================
-# BENCHMARK PRINCIPAL
-# =========================================================
-
-def run_benchmark(input_csv=None, model_name=None, port=PORT, baud=BAUDRATE, output_csv=None):
-    """Ejecuta benchmark del modelo en Arduino"""
-
-    os.makedirs(EXPORT_DIR, exist_ok=True)
-
-    print("\n" + "="*60)
-    print("BENCHMARK DE MODELO EN ARDUINO")
-    print("="*60)
-
-    # ── Determinar dataset ───────────────────────────────────────────────────
-    board_info = {}
-
-    if input_csv is None:
-        if model_name is None:
-            print("\n🔍 Detectando modelo en Arduino...")
-            model_name, board_info = get_model_from_arduino(port, baud)
-        
-        if model_name:
-            print(f"\n✅ Modelo detectado: {model_name}")
-            input_csv = find_dataset_for_model(model_name)
-            if input_csv:
-                print(f"📁 Dataset: {os.path.basename(input_csv)}")
-
-        if input_csv is None:
-            print("\n📋 Selecciona el modelo que estás probando:")
-            models = list(MODEL_DATASETS.keys())
-            for i, m in enumerate(models):
-                print(f"  {i+1}. {m}")
-            try:
-                choice = int(input("\nSelecciona (número): ")) - 1
-                if 0 <= choice < len(models):
-                    model_name = models[choice]
-                    input_csv = os.path.join(DATASET_BASE_DIR, MODEL_DATASETS[model_name])
-                    print(f"✅ Usando modelo: {model_name}")
-                    print(f"📁 Dataset: {os.path.basename(input_csv)}")
-                else:
-                    print("❌ Selección inválida")
-                    return None
-            except ValueError:
-                print("❌ Entrada inválida")
-                return None
-
-    if not os.path.exists(input_csv):
-        raise FileNotFoundError(f"Archivo no encontrado: {input_csv}")
-
-    # ── Cargar CSV ───────────────────────────────────────────────────────────
-    df_input = pd.read_csv(input_csv)
-    exclude_cols = ['label', 'label_name', 'Unnamed: 0']
-    feature_cols = [c for c in df_input.columns if c not in exclude_cols]
-    X = df_input[feature_cols].values.astype(np.float32)
-
-    if 'label' in df_input.columns:
-        y_true = df_input['label'].values
-        if 'label_name' in df_input.columns:
-            class_names = sorted(df_input['label_name'].unique(),
-                                 key=lambda x: df_input[df_input['label_name'] == x]['label'].iloc[0])
-        else:
-            class_names = [str(i) for i in np.unique(y_true)]
-    else:
-        y_true = None
-        class_names = None
-
-    print(f"\n📊 Dataset info:")
-    print(f"   Archivo:  {os.path.basename(input_csv)}")
-    print(f"   Muestras: {X.shape[0]}")
-    print(f"   Features: {X.shape[1]}")
-    if class_names:
-        print(f"   Clases:   {class_names}")
-
-    results = []
-
-    # ── Serial ───────────────────────────────────────────────────────────────
-    try:
-        ser = serial.Serial(port, baud, timeout=2)
-        time.sleep(2)
-        ser.reset_input_buffer()
-
-        print("\n🔌 Conectado")
-        total_samples = len(X)
-        print(f"\n🚀 Ejecutando benchmark sobre {total_samples} muestras...\n")
-
-        for i, row in enumerate(X):
-            csv_line = ",".join(f"{v:.6f}" for v in row) + "\n"
-            ser.write(csv_line.encode())
-            resp = ser.readline().decode().strip()
-
-            base = {
-                "sample":      i,
-                "prediccion":  -1,
-                "nombre_clase": "TIMEOUT",
-                "tiempo_us":   -1,
-                "ram_antes":   -1,
-                "ram_delta":   -1,
-                "esperado":    y_true[i] if y_true is not None else -1,
-            }
-
-            if not resp:
-                results.append(base)
-                continue
-
-            if resp.startswith("ERROR"):
-                base["nombre_clase"] = "ERROR"
-                results.append(base)
-                continue
-
-            parts = resp.split(",")
-
-            # Firmware nuevo: clase,nombre,tiempo_us,ram_antes,ram_delta
-            if len(parts) == 5:
-                base.update({
-                    "prediccion":   int(parts[0]),
-                    "nombre_clase": parts[1],
-                    "tiempo_us":    int(parts[2]),
-                    "ram_antes":    int(parts[3]),
-                    "ram_delta":    int(parts[4]),
-                })
-            # Firmware anterior: clase,nombre,tiempo_us
-            elif len(parts) == 3:
-                base.update({
-                    "prediccion":   int(parts[0]),
-                    "nombre_clase": parts[1],
-                    "tiempo_us":    int(parts[2]),
-                })
-            elif len(parts) == 2:
-                base.update({
-                    "prediccion":   int(parts[0]),
-                    "tiempo_us":    int(parts[1]),
-                    "nombre_clase": "UNKNOWN",
-                })
-
-            results.append(base)
-
-            if (i + 1) % 100 == 0:
-                print(f"  [{i+1}/{total_samples}] procesadas...")
-
-        ser.close()
-
-    except Exception as e:
-        print(f"❌ Error de conexión: {e}")
+    if len(cmd) == 0:
         return None
 
-    # ── Guardar resultados ───────────────────────────────────────────────────
-    df = pd.DataFrame(results)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if cmd[0] != RESP_INFO:
+        return None
 
-    if output_csv:
-        output_file = os.path.join(EXPORT_DIR, output_csv)
-    else:
-        base_name = os.path.splitext(os.path.basename(input_csv))[0]
-        output_file = os.path.join(EXPORT_DIR, f"results_{base_name}_{timestamp}.csv")
+    ln = ser.read(1)
 
-    df.to_csv(output_file, index=False)
+    if len(ln) == 0:
+        return None
 
-    df_ok = df[df["prediccion"] != -1]
+    name_len = ln[0]
 
-    # ── Stats de tiempos ─────────────────────────────────────────────────────
-    print("\n" + "="*60)
-    print("RESULTADOS DEL BENCHMARK - TIEMPOS")
-    print("="*60)
-    print(f"Muestras válidas:   {len(df_ok)}/{len(df)}")
+    name = ser.read(name_len)
 
-    if len(df_ok) > 0:
-        tiempos = df_ok['tiempo_us'].values
-        print(f"Tiempo promedio:    {np.mean(tiempos):.1f} us")
-        print(f"Tiempo máximo:      {np.max(tiempos)} us")
-        print(f"Tiempo mínimo:      {np.min(tiempos)} us")
-        print(f"Frecuencia:         {1e6/np.mean(tiempos):.1f} Hz")
+    if len(name) != name_len:
+        return None
 
-    # ── Stats de RAM ─────────────────────────────────────────────────────────
-    has_ram = 'ram_antes' in df_ok.columns and not df_ok['ram_antes'].eq(-1).all()
+    meta = ser.read(2)
 
-    if has_ram:
-        print("\n" + "="*60)
-        print("RESULTADOS DEL BENCHMARK - RAM")
-        print("="*60)
+    if len(meta) != 2:
+        return None
 
-        if board_info.get("free_ram"):
-            print(f"Free RAM (boot):     {board_info['free_ram']} bytes")
-        if board_info.get("min_free_ram"):
-            print(f"Min Free RAM (boot): {board_info['min_free_ram']} bytes")
-        if board_info.get("largest_block"):
-            print(f"Largest block (boot):{board_info['largest_block']} bytes")
+    n_features, n_classes = meta[0], meta[1]
 
-        ram_vals  = df_ok['ram_antes'].values
-        ram_deltas = df_ok['ram_delta'].values
+    return {
+        "name": name.decode(errors="ignore"),
+        "n_features": n_features,
+        "n_classes": n_classes
+    }
 
-        print(f"\nRAM libre (inferencias):")
-        print(f"  Promedio:  {np.mean(ram_vals):.0f} bytes")
-        print(f"  Mínimo:    {np.min(ram_vals)} bytes")
-        print(f"  Máximo:    {np.max(ram_vals)} bytes")
 
-        print(f"\nDelta RAM por inferencia (consumo dinámico):")
-        print(f"  Promedio:  {np.mean(ram_deltas):.1f} bytes")
-        print(f"  Máximo:    {np.max(ram_deltas)} bytes")
-        print(f"  Mínimo:    {np.min(ram_deltas)} bytes")
+# =========================================================
+# READ RESPONSE (DATA + LOGS)
+# =========================================================
+def read_response(ser):
 
-        leaks = (ram_deltas > 0).sum()
-        if leaks == 0:
-            print(f"\n  ✅ Sin allocations dinámicas detectadas (delta siempre 0)")
-        else:
-            print(f"\n  ⚠️  {leaks}/{len(ram_deltas)} inferencias con delta > 0 (posible malloc interno)")
+    try:
 
-        plot_ram_usage(df_ok, model_name or "modelo", EXPORT_DIR)
+        while True:
 
-    # ── Métricas de clasificación ────────────────────────────────────────────
-    if y_true is not None and len(df_ok) > 0:
-        y_true_valid = df_ok['esperado'].values
-        y_pred_valid = df_ok['prediccion'].values
+            # ---------------------------------
+            # WAIT MAGIC
+            # ---------------------------------
+            b = ser.read(1)
 
-        print("\n" + "="*60)
-        print("CLASSIFICATION REPORT")
-        print("="*60)
-        print(classification_report(y_true_valid, y_pred_valid, target_names=class_names))
+            if len(b) == 0:
+                return None
 
-        accuracy  = accuracy_score(y_true_valid, y_pred_valid)
-        precision = precision_score(y_true_valid, y_pred_valid, average='macro', zero_division=0)
-        recall    = recall_score(y_true_valid, y_pred_valid, average='macro', zero_division=0)
-        f1        = f1_score(y_true_valid, y_pred_valid, average='macro', zero_division=0)
+            if b[0] != MAGIC:
+                continue
 
-        print("-"*60)
-        print("MACRO AVERAGE:")
-        print(f"  Accuracy:  {accuracy:.4f} ({accuracy*100:.2f}%)")
-        print(f"  Precision: {precision:.4f}")
-        print(f"  Recall:    {recall:.4f}")
-        print(f"  F1-Score:  {f1:.4f}")
-        print("="*60)
+            # ---------------------------------
+            # READ COMMAND
+            # ---------------------------------
+            cmd = ser.read(1)
 
-        plot_confusion_matrix(y_true_valid, y_pred_valid, class_names,
-                              model_name or "modelo", EXPORT_DIR)
+            if len(cmd) == 0:
+                return None
 
-        metrics_row = {
-            'modelo':           model_name,
-            'accuracy':         accuracy,
-            'precision_macro':  precision,
-            'recall_macro':     recall,
-            'f1_macro':         f1,
-            'tiempo_us_mean':   np.mean(tiempos) if len(df_ok) > 0 else -1,
-            'tiempo_us_max':    np.max(tiempos)  if len(df_ok) > 0 else -1,
-            'timestamp':        timestamp,
-        }
+            cmd = cmd[0]
 
-        # Agregar RAM a métricas si disponible
-        if has_ram:
-            metrics_row.update({
-                'ram_libre_mean':  np.mean(ram_vals),
-                'ram_libre_min':   np.min(ram_vals),
-                'ram_delta_mean':  np.mean(ram_deltas),
-                'ram_delta_max':   np.max(ram_deltas),
-            })
+            # =================================
+            # LOG PACKET
+            # =================================
+            if cmd == RESP_LOG:
 
-        metrics_df = pd.DataFrame([metrics_row])
-        metrics_file = os.path.join(EXPORT_DIR, f"metrics_{model_name}_{timestamp}.csv")
-        metrics_df.to_csv(metrics_file, index=False)
-        print(f"\n📊 Metrics saved: {metrics_file}")
+                hdr = ser.read(2)
 
-    print(f"\n💾 Results saved in: {EXPORT_DIR}/")
-    return df
+                if len(hdr) != 2:
+                    continue
+
+                msg_len = struct.unpack("<H", hdr)[0]
+
+                msg = ser.read(msg_len)
+
+                if len(msg) != msg_len:
+                    continue
+
+                try:
+                    txt = msg.decode("utf-8")
+                except Exception:
+                    txt = str(msg)
+
+                print(f"[ESP] {txt}")
+
+                # seguir esperando RESP_DATA
+                continue
+
+            # =================================
+            # DATA PACKET
+            # =================================
+            if cmd == RESP_DATA:
+
+                payload = ser.read(8)
+
+                if len(payload) != 8:
+                    return None
+
+                cls, dt = struct.unpack("<ii", payload)
+
+                return cls
+
+            # =================================
+            # UNKNOWN PACKET
+            # =================================
+            print(f"[WARN] Unknown packet: 0x{cmd:02X}")
+
+    except Exception as e:
+        print("read_response error:", e)
+        return None
+
+
+# =========================================================
+# DATASET DISCOVERY
+# =========================================================
+def discover_datasets(base_dir):
+
+    datasets = {}
+
+    for name in os.listdir(base_dir):
+
+        path = os.path.join(base_dir, name)
+
+        if not os.path.isdir(path):
+            continue
+
+        files = os.listdir(path)
+
+        if (
+            any(f.startswith("X_") for f in files)
+            and
+            any(f.startswith("y_") for f in files)
+        ):
+            datasets[name] = path
+
+    return datasets
+
+
+# =========================================================
+# LOAD DATASET
+# =========================================================
+def load_dataset(folder):
+
+    x_path = os.path.join(folder, "X_test.npy")
+    y_path = os.path.join(folder, "y_test.npy")
+
+    X = np.load(x_path).astype(np.float32)
+    y = np.load(y_path)
+
+    return X, y
+
+
+# =========================================================
+# FLATTEN
+# =========================================================
+def flatten(X):
+    return X.reshape(X.shape[0], -1).astype(np.float32)
+
+
+# =========================================================
+# SEND SAMPLE
+# =========================================================
+def send_row(ser, row):
+
+    row = np.asarray(row, dtype=np.float32)
+
+    n = len(row)
+
+    packet = struct.pack(
+        "<BBH",
+        MAGIC,
+        CMD_DATA,
+        n
+    )
+
+    packet += row.tobytes()
+
+    ser.write(packet)
 
 
 # =========================================================
 # MAIN
 # =========================================================
+def run():
 
-def main():
-    import argparse
+    DATASET_BASE_DIR = "./model_input/datasets"
 
-    parser = argparse.ArgumentParser(description='Benchmark de modelo en Arduino')
-    parser.add_argument('--input',  '-i', type=str, help='Archivo CSV de entrada')
-    parser.add_argument('--model',  '-m', type=str, help='Nombre del modelo (ej: IMU_WITH_GPS_RF)')
-    parser.add_argument('--port',   '-p', type=str, default=PORT, help='Puerto serial')
-    parser.add_argument('--output', '-o', type=str, help='Archivo de salida')
-    parser.add_argument('--list',   '-l', action='store_true', help='Listar datasets disponibles')
-    parser.add_argument('--detect', '-d', action='store_true', help='Detectar modelo desde Arduino')
+    datasets = discover_datasets(DATASET_BASE_DIR)
 
-    args = parser.parse_args()
-
-    if args.list:
-        list_available_datasets()
-        return
-
-    if args.detect:
-        print("\n🔍 Detectando modelo...")
-        model, info = get_model_from_arduino(args.port, BAUDRATE)
-        if model:
-            print(f"\n✅ Modelo detectado: {model}")
-        else:
-            print("\n❌ No se pudo detectar el modelo")
-        return
-
-    run_benchmark(
-        input_csv=args.input,
-        model_name=args.model,
-        port=args.port,
-        output_csv=args.output,
+    ser = serial.Serial(
+        PORT,
+        BAUDRATE,
+        timeout=1
     )
 
+    time.sleep(2)
+
+    # -----------------------------------------------------
+    # MODEL INFO
+    # -----------------------------------------------------
+    request_info(ser)
+
+    model_info = None
+
+    start = time.time()
+
+    while time.time() - start < 5:
+
+        model_info = read_info(ser)
+
+        if model_info is not None:
+            break
+
+    print("MODEL INFO:", model_info)
+
+    if model_info is None:
+        raise RuntimeError(
+            "Failed to read model info"
+        )
+
+    # -----------------------------------------------------
+    # DATASET
+    # -----------------------------------------------------
+    if model_info["name"] not in datasets:
+        raise ValueError(
+            f"No dataset for {model_info['name']}"
+        )
+
+    X, y = load_dataset(
+        datasets[model_info["name"]]
+    )
+
+    # X = np.transpose(X, (0, 2, 1))
+
+    X = flatten(X)
+
+    print("Dataset shape:", X.shape)
+
+    # -----------------------------------------------------
+    # INFERENCE
+    # -----------------------------------------------------
+    results = []
+    times = []
+
+    print("\n🚀 RUNNING...\n")
+
+    for i in range(len(X)):
+
+        t0 = time.perf_counter()
+
+        send_row(ser, X[i])
+        pred = read_response(ser)
+
+        t1 = time.perf_counter()
+
+        dt_ms = (t1 - t0) * 1000.0
+        times.append(dt_ms)
+
+        print(f"{i:5d} | true={y[i]} pred={pred} | {dt_ms:.2f} ms")
+
+        results.append({
+            "true": int(y[i]),
+            "pred": int(pred) if pred is not None else -1
+        })
+
+    ser.close()
+
+    # -----------------------------------------------------
+    # METRICS
+    # -----------------------------------------------------
+    df = pd.DataFrame(results)
+    df_ok = df[df["pred"] != -1]
+
+    print("\n================ METRICS ================")
+
+    if len(df_ok) == 0:
+        print("❌ No valid predictions")
+        return
+
+    print("Accuracy :", accuracy_score(df_ok["true"], df_ok["pred"]))
+
+    print("Precision:", precision_score(df_ok["true"], df_ok["pred"],
+                                        average="macro", zero_division=0))
+
+    print("Recall   :", recall_score(df_ok["true"], df_ok["pred"],
+                                    average="macro", zero_division=0))
+
+    print("F1       :", f1_score(df_ok["true"], df_ok["pred"],
+                                average="macro", zero_division=0))
+
+    # =========================================================
+    # CONFUSION MATRIX
+    # =========================================================
+    labels = ["Frenado", "Giro", "Normal", "Resalto"]
+
+    cm_norm = confusion_matrix(df_ok["true"], df_ok["pred"], normalize="true")
+
+
+    # ---- normalized
+    sns.heatmap(
+        cm_norm,
+        annot=True,
+        fmt=".2f",
+        cmap="Greens",
+        xticklabels=labels,
+        yticklabels=labels
+    )
+    plt.title("Confusion Matrix (Normalized)")
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+
+    plt.suptitle(model_info["name"])
+    plt.tight_layout()
+    plt.show()
+
+    # =========================================================
+    # TIMING METRICS
+    # =========================================================
+    times = np.array(times)
+
+    print("\n================ TIMING ================")
+    print(f"Avg latency : {times.mean():.2f} ms")
+    print(f"Min latency : {times.min():.2f} ms")
+    print(f"Max latency : {times.max():.2f} ms")
+    print(f"Std dev     : {times.std():.2f} ms")
 
 if __name__ == "__main__":
-    main()
+    run()

@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 
-from Viewer.utils.helper import LPF2, LPF4, gps_course_to_enu_deg
-from Viewer.utils.attitude_ekf import AttitudeEKF
+from utils.helper import LPF2, LPF4, gps_course_to_enu_deg
+from utils.attitude_ekf import AttitudeEKF
 
 
 # GYRO
@@ -94,7 +94,7 @@ class EKFProcessor:
             )
 
         ekf_acc = self.ekf.linear_acceleration(acc_raw)
-        ekf_gyro = self.ekf.angular_velocity(acc_raw)
+        ekf_gyro = self.ekf.angular_velocity(gyro_raw)
         roll, pitch, yaw = self.ekf.orientation()
 
         acc_lpf_xy = self.lpf_acc_xy.step(acc_raw)
@@ -124,9 +124,9 @@ class EKFProcessor:
             "ekf_gy": ekf_gyro[1],
             "ekf_gz": ekf_gyro[2],
 
-            "ekf_x": ekf_acc[0],
-            "ekf_y": ekf_acc[1],
-            "ekf_z": ekf_acc[2],
+            "ekf_ax": ekf_acc[0],
+            "ekf_ay": ekf_acc[1],
+            "ekf_az": ekf_acc[2],
 
             "gps_speed": gps_speed,
             "gps_lat": gps_lat,

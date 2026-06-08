@@ -143,8 +143,20 @@ void loop()
             FeaturePacket featPkt;
             if (eventWindowPush(eventWin, meanPkt, sessionID, featPkt))
             {
-                // networkPublish(featPkt, MQTT_TOPIC_EVENT);
+#if defined(MODEL_TYPE_CNN)
+
+                float window[IMU_CHANNELS * EVENT_WINDOW_SIZE];
+
+                eventWindowToTensor(
+                    eventWin,
+                    window,
+                    IMU_CHANNELS,
+                    EVENT_WINDOW_SIZE);
+                InferenceResult result = infer(window, sessionID);
+#else
                 InferenceResult result = infer(featPkt);
+#endif
+                // networkPublish(featPkt, MQTT_TOPIC_EVENT);
                 // Ignorar NORMAL
                 if (result.label != static_cast<uint8_t>(EventType::NORMAL))
                 {

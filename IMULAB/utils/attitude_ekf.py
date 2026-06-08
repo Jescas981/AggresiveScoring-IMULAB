@@ -1,5 +1,5 @@
 import numpy as np
-from Viewer.utils.mymath import skew, rotvec_to_quat, quat_mult, quat_to_rot
+from utils.mymath import skew, rotvec_to_quat, quat_mult, quat_to_rot
 
 GRAVITY_MAG = 9.80665
 GRAVITY_VEC = np.array([0, 0, GRAVITY_MAG])

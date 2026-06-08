@@ -41,6 +41,19 @@ struct EventWindow
     size_t count;
 };
 
+static inline void eventWindowToTensor(
+    const EventWindow& ew,
+    float* out,
+    uint8_t C,
+    uint8_t T
+) {
+    for (uint8_t c = 0; c < C; c++) {
+        for (uint8_t t = 0; t < T; t++) {
+            out[c * T + t] = ew.buf[t][c];
+        }
+    }
+}
+
 inline void eventWindowReset(EventWindow &ew)
 {
     memset(ew.buf, 0, sizeof(ew.buf));
