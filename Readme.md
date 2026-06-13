@@ -1,6 +1,6 @@
 # RealtimeAggressiveScoringSystem
 
-![DEMO](IMULAB/docs/preview.gif)
+![DEMO](IMULAB/docs/Demo.gif)
 
 ## Embeed - Code ready to be uploaded on microcontroller
 Code is ready to be uplodad on microcontroller
