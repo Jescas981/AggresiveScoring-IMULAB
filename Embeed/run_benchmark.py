@@ -352,8 +352,7 @@ def run():
     # =========================================================
     labels = ["Frenado", "Giro", "Normal", "Resalto"]
 
-    cm_norm = confusion_matrix(df_ok["true"], df_ok["pred"], normalize="true")
-
+    cm_norm = confusion_matrix(df_ok["true"], df_ok["pred"], normalize='true')
 
     # ---- normalized
     sns.heatmap(
@@ -364,9 +363,9 @@ def run():
         xticklabels=labels,
         yticklabels=labels
     )
-    plt.title("Confusion Matrix (Normalized)")
-    plt.xlabel("Predicted")
-    plt.ylabel("True")
+    plt.title("Matriz de confusión")
+    plt.xlabel("Predecido")
+    plt.ylabel("Verdadero")
 
     plt.suptitle(model_info["name"])
     plt.tight_layout()
@@ -382,6 +381,17 @@ def run():
     print(f"Min latency : {times.min():.2f} ms")
     print(f"Max latency : {times.max():.2f} ms")
     print(f"Std dev     : {times.std():.2f} ms")
+
+    from sklearn.metrics import classification_report
+
+    print("\n================ CLASS REPORT ================\n")
+
+    print(classification_report(
+        df_ok["true"],
+        df_ok["pred"],
+        target_names=["Frenado", "Giro", "Normal", "Resalto"],
+        zero_division=0
+    ))
 
 if __name__ == "__main__":
     run()
