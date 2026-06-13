@@ -1,5 +1,7 @@
 # RealtimeAggressiveScoringSystem
 
+![DEMO](IMULAB/docs/preview.gif)
+
 ## Embeed - Code ready to be uploaded on microcontroller
 Code is ready to be uplodad on microcontroller
 
@@ -19,4 +21,5 @@ IMU Lab is a browser-based tool designed for exploring, visualizing, and annotat
 Link will be available soon ...
 
 ## Paper link and reference
+
 Link will be available soon ...
